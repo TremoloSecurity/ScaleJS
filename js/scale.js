@@ -3,7 +3,35 @@
 
   var config =
   {
-    displayNameAttribute:"cn"
+    displayNameAttribute:"cn",
+    frontPage : {
+      title : "Scale Main Page",
+      text : "Here are your apps, request access...if you dare!!!!!!"
+    },
+    canEditUser : false,
+    attributes : {
+      "uid":{
+        name : "uid",
+        displayName:"Login ID",
+        readOnly:true
+      },
+      "l":{
+        name : "l",
+        displayName:"Location",
+        readOnly:true
+      },
+      "sn": {
+        name : "sn",
+        displayName:"Last Name",
+        readOnly:true
+      },
+      "cn":{
+        name : "cn",
+        displayName:"Full Name",
+        readOnly:true
+      }
+    }
+
   };
 
   var user =
@@ -19,7 +47,7 @@
           {"values":["Test SAML2"],"name":"cn"},
           {"values":["inetOrgPerson"],"name":"objectClass"}
         ],
-      "groups":["linkedSAMLUsers"]
+      "groups":["This is my role","and it is mine"]
     };
 
     var openApprovals =
@@ -45,7 +73,7 @@
       this.cart = [];
       this.approvals = openApprovals;
       this.reports = [""];
-
+      this.user = user;
       //Initialize the attributes
       for (var i in user.attributes) {
         this.attributes[user.attributes[i].name] = user.attributes[i].values[0];
@@ -72,6 +100,7 @@
       this.setSelectedTab = function(val) {
         this.currentTab = val;
       };
+
 
     });
 })();

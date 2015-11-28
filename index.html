@@ -82,7 +82,43 @@ limitations under the License.
 	</div>
 
 	<div class="jumbotron">
-	  <h2>Main Page</h2>
+		<div ng-show="scale.isSelectedTab('user')">
+	  	<h2>{{ scale.displayName() + "'s Profile" }}</h2>
+
+			<div class="row">
+					<div class="col-md-6">
+						<h3>Attributes</h3>
+
+						<!-- For users that can be edited -->
+
+						<!-- For users that can NOT be edited -->
+						<div ng-hide="scale.config.canEditUser">
+							<div class="row" ng-repeat="attributeConfig in scale.config.attributes">
+									<div class="col-md-4">{{ attributeConfig.displayName}}</div>
+									<div class="col-md-4"><label>{{ scale.attributes[attributeConfig.name] }}</label></div>
+								</div>
+						</div>
+					</div>
+
+					<div class="col-md-6">
+						<h3>Roles</h3>
+						<div ng-hide="scale.user.groups.length" class="alert alert-info" >{{ scale.displayName() }} has no roles assigned</div>
+
+
+						<ul class="list-group" ng-show="scale.user.groups.length">
+								<li class="list-group-item" ng-repeat="groupName in scale.user.groups">{{ groupName }}</li>
+						</ul>
+
+					</div>
+			</div>
+
+		</div>
+
+		<div ng-show="scale.isSelectedTab('home')">
+	  	<h2>{{ scale.config.frontPage.title }}</h2>
+			{{ scale.config.frontPage.text }}
+
+		</div>
 
 
 	</div>
