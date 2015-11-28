@@ -1,0 +1,98 @@
+<!--
+Copyright 2015 Tremolo Security, Inc.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+ -->
+<html ng-app="scale">
+<head >
+	    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tremolo Security Scale - INSERT TITLE</title>
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css" rel="stylesheet" />
+	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css"
+      type="text/css" rel="stylesheet" />
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+		<!--
+		Need to figure out how to handle
+		<panelGroup rendered="${commonUiHelper.isIE9()}">
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+   </panelGroup> -->
+
+</head>
+<body ng-controller="ScaleController as scale">
+	<div class="container">
+	<!-- Static navbar -->
+	<div class="navbar navbar-default" role="navigation">
+	  <div class="container-fluid">
+	    <div class="navbar-header">
+	      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+	        <span class="sr-only">Toggle navigation</span>
+	        <span class="icon-bar"></span>
+	        <span class="icon-bar"></span>
+	        <span class="icon-bar"></span>
+	      </button>
+	      <img class="hidden-xs" src="images/logo-desktop.png"  width="85%" alt="scale"/>
+	      <img class="visible-xs img-responsive" src="images/logo-mobile.png" alt="scale" />
+	    </div>
+	    <div class="navbar-collapse collapse">
+	      <ul class="nav navbar-nav">
+					<li  ng-class="{active:scale.isSelectedTab('user')}">
+					  <a href ng-click="scale.setSelectedTab('user')" style="color:#484848"  >{{ scale.displayName() }}</a>
+					</li>
+					<li ng-class="{active:scale.isSelectedTab('home')}" >
+						<a href ng-click="scale.setSelectedTab('home')" style="color:#484848">Home</a>
+					</li>
+					<li ng-class="{active:scale.isSelectedTab('requestAccess')}">
+						<a href ng-click="scale.setSelectedTab('requestAccess')" style="color:#484848">Request Access</a>
+					</li>
+					<li ng-class="{active:scale.isSelectedTab('checkOut')}">
+						<a href ng-click="scale.setSelectedTab('checkOut')" style="color:#484848">Check Out
+							<span class="badge alert-danger" ng-show="scale.cart.length">{{ scale.cart.length }}</span>
+	          </a>
+	        </li>
+					<li ng-class="{active:scale.isSelectedTab('approvals')}" ng-show="scale.approvals.length" >
+	        	<a href ng-click="scale.setSelectedTab('approvals')" style="color:#484848">Open Approvals
+	            <span class="badge alert-danger">{{ scale.approvals.length }}</span></a>
+	        </li>
+					<li ng-class="{active:scale.isSelectedTab('reports')}" ng-show="scale.reports.length">
+	        	<a href ng-click="scale.setSelectedTab('reports')" style="color:#484848">Reports</a>
+	        </li>
+					<li ng-class="{active:scale.isSelectedTab('logout')}">
+						<a href ng-click="scale.setSelectedTab('logout')" style="color:#484848">Logout</a>
+					</li>
+				</ul>
+
+	    </div><!--/.nav-collapse -->
+	  </div><!--/.container-fluid -->
+	</div>
+
+	<div class="jumbotron">
+	  <h2>Main Page</h2>
+
+
+	</div>
+
+
+	<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+	<!-- Include all compiled plugins (below), or include individual files as needed -->
+	<script src="js/bootstrap.min.js"></script>
+	<script src="js/angular.min.js"></script>
+<script src="js/scale.js"></script>
+</body>
+</html>
