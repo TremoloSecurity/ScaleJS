@@ -38,6 +38,35 @@ limitations under the License.
 </head>
 <body ng-controller="ScaleController as scale">
 	<div class="container">
+
+		<div ng-show="! scale.isSessionLoaded()">
+			<div class="navbar navbar-default" role="navigation">
+			  <div class="container-fluid">
+			    <div class="navbar-header">
+			      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+			        <span class="sr-only">Toggle navigation</span>
+			        <span class="icon-bar"></span>
+			        <span class="icon-bar"></span>
+			        <span class="icon-bar"></span>
+			      </button>
+			      <img class="hidden-xs" src="images/logo-desktop.png"  width="85%" alt="scale"/>
+			      <img class="visible-xs img-responsive" src="images/logo-mobile.png" alt="scale" />
+			    </div>
+			    <div class="navbar-collapse collapse">
+			      <ul class="nav navbar-nav">
+
+						</ul>
+
+			    </div><!--/.nav-collapse -->
+			  </div><!--/.container-fluid -->
+			</div>
+			<div class="jumbotron">
+				<center><h1>Logging In</h1></center>
+				<center><h1><i class="fa fa-refresh fa-spin block"></i></h1></center>
+			</div>
+		</div>
+		<div ng-show="scale.isSessionLoaded()">
+
 	<!-- Static navbar -->
 	<div class="navbar navbar-default" role="navigation">
 	  <div class="container-fluid">
@@ -474,7 +503,9 @@ limitations under the License.
 
 	</div>
 
+	</div>
 
+</div>
 
 	<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>

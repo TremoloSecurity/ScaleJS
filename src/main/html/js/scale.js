@@ -200,6 +200,7 @@ limitations under the License.
     };
 
     app.controller('ScaleController',['$compile', '$scope','$window',function($compile, $scope, $window){
+      this.sessionLoaded = false;
       this.config = config;
       this.attributes = {};
       this.currentTab = 'home';
@@ -372,6 +373,10 @@ limitations under the License.
         } else {
           return "Denial";
         }
+      }
+
+      this.isSessionLoaded = function() {
+        return this.sessionLoaded;
       }
 
     }]);
