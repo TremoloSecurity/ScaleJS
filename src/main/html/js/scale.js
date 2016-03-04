@@ -199,7 +199,7 @@ limitations under the License.
       ]
     };
 
-    app.controller('ScaleController',['$compile', '$scope','$window',function($compile, $scope, $window){
+    app.controller('ScaleController',['$compile', '$scope','$window','$http',function($compile, $scope, $window, $http){
       this.sessionLoaded = false;
       this.config = config;
       this.attributes = {};
@@ -378,6 +378,15 @@ limitations under the License.
       this.isSessionLoaded = function() {
         return this.sessionLoaded;
       }
+
+      this.setSessionLoadedComplete = function() {
+        this.sessionLoaded = true;
+      }
+
+      angular.element(document).ready(function () {
+        $scope.scale.setSessionLoadedComplete();
+        $scope.$apply();
+      });
 
     }]);
 
