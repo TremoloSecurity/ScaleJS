@@ -13,7 +13,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
  -->
-<html ng-app="scale">
+<html ng-app="scale" lang="en">
 <head >
 	    <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -22,6 +22,8 @@ limitations under the License.
 
     <!-- Bootstrap -->
     <link href="css/bootstrap.min.css" rel="stylesheet" />
+		<link href="css/angular.treeview.css" rel="stylesheet" />
+		<link href="css/unison.css" rel="stylesheet" />
 	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css"
       type="text/css" rel="stylesheet" />
     <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
@@ -62,7 +64,7 @@ limitations under the License.
 					</li>
 					<li ng-class="{active:scale.isSelectedTab('checkOut')}">
 						<a href ng-click="scale.setSelectedTab('checkOut')" style="color:#484848">Check Out
-							<span class="badge alert-danger" ng-show="scale.cart.length">{{ scale.cart.length }}</span>
+							<span class="badge alert-danger" ng-hide="scale.isCartEmpty()">{{ scale.numItemsInCart() }}</span>
 	          </a>
 	        </li>
 					<li ng-class="{active:scale.isSelectedTab('approvals')}" ng-show="scale.approvals.length" >
@@ -90,6 +92,18 @@ limitations under the License.
 						<h3>Attributes</h3>
 
 						<!-- For users that can be edited -->
+						<div ng-show="scale.config.canEditUser" ng-controller="SaveUserController as saveUser">
+							<form name="saveUserForm">
+								<div class="row" ng-repeat="attributeConfig in scale.config.attributes">
+										<div class="col-md-4">{{ attributeConfig.displayName}}</div>
+										<div class="col-md-4" ng-hide="attributeConfig.readOnly" ><input type="text" ng-model="saveUser.userToSave[attributeConfig.name].value"  aria-label="{{ attributeConfig.displayName }}"></input></div>
+										<div class="col-md-4" ng-show="attributeConfig.readOnly"><label>{{ scale.attributes[attributeConfig.name] }}</label></div>
+								</div>
+								<div class="row">
+									<input type="button" class="btn btn-lg btn-primary" value="Save" />
+								</div>
+							</form>
+						</div>
 
 						<!-- For users that can NOT be edited -->
 						<div ng-hide="scale.config.canEditUser">
@@ -120,15 +134,356 @@ limitations under the License.
 
 		</div>
 
+		<div ng-show="scale.isSelectedTab('requestAccess')">
+	  	<h2>Request Access to Applications</h2>
+			<div class="row">
+				<div class="col-md-6">
+					<div
+						data-angular-treeview="true"
+						data-tree-id="requestAccessOrgs"
+						data-tree-model="scale.orgs"
+						data-node-id="id"
+						data-node-label="name"
+						data-node-children="subOrgs"
+						data-ng-click="scale.selectRequestAccessOrg(requestAccessOrgs.currentNode)"
+						>
+					</div>
+				</div>
+
+				<div class="col-md-6">
+					<div class="alert alert-info " >
+						<h3 >{{ scale.requestAccessCurrentNode.name }}</h3>
+						{{ scale.requestAccessCurrentNode.description }}
+					</div>
+				</div>
+
+			</div>
+
+			<div class="row" ng-class-odd="'row-odd'" ng-class-even="'row-even'" ng-repeat="workflow in scale.requestAccessCurentWorkflows">
+				<div class="col-md-4">
+					<a href ng-click="scale.toggleWorkflow(workflow)">{{ scale.cartLinkLabel(workflow) }}</a>
+						<span ng-show="scale.isWorkflowCompleted(workflow.name)" class="badge alert-success">Approved</span>
+				</div>
+				<div class="col-md-4">
+					{{workflow.label}}
+				</div>
+				<div class="col-md-4">
+					{{workflow.description}}
+				</div>
+			</div>
+
+		</div>
+		<div ng-show="scale.isSelectedTab('checkOut')">
+			<div class="alert alert-info" ng-show="scale.isCartEmpty()">
+						{{ scale.displayName() }} does not have any open requests. Click
+						"Request Access" to make requests.</div>
+
+			<div class="row"  ng-repeat="wf in scale.cart" ng-class-odd="'row-odd'" ng-class-even="'row-even'">
+				<div class="col-md-3">
+				  <a href ng-click="scale.toggleWorkflow(wf)">Remove From Cart</a>
+
+				</div>
+				<div class="col-md-3">{{ wf.label }}</div>
+				<div class="col-md-3">{{ wf.description }}</div>
+				<div class="col-md-3">
+				  <input type="text" ng-value="{{ wf.reason }}" placeholder="Supply Reason" required="true" aria-label="Reason for request"></input>
+				</div>
+			</div>
+		</div>
+
+		<div ng-show="scale.isSelectedTab('approvals')  && ! scale.isApprovalSub()">
+			<div class="row"  ng-show="scale.isMobile()" resize>
+					<div class="col-md-2"><b>Action</b></div>
+					<div class="col-md-2"><b>Subject</b></div>
+					<div class="col-md-3"><b>{{ scale.config.workflowName }}</b></div>
+					<div class="col-md-3"><b>Request</b></div>
+					<div class="col-md-2"><b>Date Opened</b></div>
+			</div>
+			<div class="row"  ng-repeat="approval in scale.approvals" ng-class-odd="'row-odd'" ng-class-even="'row-even'">
+				<div class="col-md-2"><input type="button" class="btn btn-primary" value="Review" ng-click="scale.reviewApproval(approval)"/></div>
+				<div class="col-md-2"><span  ng-show="! scale.isMobile()"><b>Subject : </b></span>{{ approval.user }}</div>
+				<div class="col-md-3"><span  ng-show="! scale.isMobile()"><b>{{ scale.config.workflowName }} : </b></span>{{ approval.wfLabel }}</div>
+				<div class="col-md-3"><span  ng-show="! scale.isMobile()"><b>Request : </b></span>{{ approval.label }}</div>
+				<div class="col-md-2"><span  ng-show="! scale.isMobile()"><b>Date Opened : </b></span>{{ approval.approvalStart | date : 'short' }}</div>
+			</div>
+		</div>
+
+
+		<!-- Approval / Denial -->
+		<div ng-show="scale.isSelectedTab('approvals') && scale.isApprovalSub() && ! scale.isApprovalConfirm() ">
+			<div class="row" ng-show="scale.isApprovalError()">
+				<div class="alert alert-danger" >
+					<b>There was a problem acting on
+						{{ scale.currentApproval.userObj.displayName }}'s request:</b>
+					<ul>
+							<li ng-repeat="msg in scale.approvalErrors">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
+			<div class="row">
+				<h3>Request Details</h3>
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.userObj.displayName }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Name</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfLabel }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Description</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfDescription }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Request Started</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfStart | date : 'short'}}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject's Request</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.label }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject's Request Reason</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.reason }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Approval Opened</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.approvalStart | date : 'short' }}</div>
+				</div>
+
+			</div>
+
+			<div class="row">
+				<h3>Subject Information</h3>
+				<div class="col-md-6">
+					<h4>Attributes</h4>
+
+
+
+
+					<div class="row" ng-repeat="attr in scale.currentApproval.userObj.attribs">
+
+							<div class="col-md-4">
+								<b>{{ attr.label }}</b>
+							</div>
+							<div class="col-md-4">{{ attr.values[0] }}</div>
+
+					</div>
+
+				</div>
+
+
+
+
+				<div class="col-md-6">
+					<h4>Roles</h4>
+					<div ng-show="scale.currentApproval.userObj.groups.length == 0">
+						<div class="alert alert-info" >{{ scale.currentApproval.userObj.attribs[scale.config.displayNameAttribute].values[0] }}
+							has no roles assigned</div>
+					</div>
+					<div ng-show="scale.currentApproval.userObj.groups.length > 0">
+						<ul class="list-group">
+								<li class="list-group-item" ng-repeat="groupName in scale.currentApproval.userObj.groups">{{ groupName }}</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+			<div class="row">
+				<h3>Act on Request</h3>
+
+					<div class="row">
+						<div class="col-md-4">
+							<b>Justification</b>
+						</div>
+
+						<div class="col-md-8">
+							<input type="text" ng-model="scale.currentApproval.justification"></input>
+						</div>
+					</div>
+					<div class="row">
+						<br />
+					</div>
+					<div class="row">
+						<div class="col-md-3"></div>
+						<div class="col-md-3">
+
+							<input type="button" class="btn btn-lg btn-success btn-block"
+								value="Approve Request" ng-click="scale.confirmApproval()"/>
+
+						</div>
+						<div class="col-md-3">
+							<input type="button" class="btn btn-lg btn-danger btn-block"
+								value="Deny Request" ng-click="scale.confirmDenial()" />
+						</div>
+
+					</div>
+			</div>
+
+		</div>
+
+		<!-- Confirm Approval/Denial -->
+		<div ng-show="scale.isSelectedTab('approvals') && scale.isApprovalSub() && scale.isApprovalConfirm()">
+			<div class="row">
+				<h3>Request Details</h3>
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.userObj.displayName }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Name</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfLabel }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Description</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfDescription }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>{{ scale.config.workflowName }}
+							Request Started</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.wfStart | date : 'short'}}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject's Request</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.label }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Subject's Request Reason</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.reason }}</div>
+				</div>
+
+				<div class="row">
+					<div class="col-md-4">
+						<b>Approval Opened</b>
+					</div>
+					<div class="col-md-8">{{ scale.currentApproval.approvalStart | date : 'short' }}</div>
+				</div>
+
+			</div>
+
+			<div class="row">
+				<h3>Subject Information</h3>
+				<div class="col-md-6">
+					<h4>Attributes</h4>
+
+
+
+
+					<div class="row" ng-repeat="attr in scale.currentApproval.userObj.attribs">
+
+							<div class="col-md-4">
+								<b>{{ attr.label }}</b>
+							</div>
+							<div class="col-md-4">{{ attr.values[0] }}</div>
+
+					</div>
+
+				</div>
+
+
+
+
+				<div class="col-md-6">
+					<h4>Roles</h4>
+					<div ng-show="scale.currentApproval.userObj.groups.length == 0">
+						<div class="alert alert-info" >{{ scale.currentApproval.userObj.attribs[scale.config.displayNameAttribute].values[0] }}
+							has no roles assigned</div>
+					</div>
+					<div ng-show="scale.currentApproval.userObj.groups.length > 0">
+						<ul class="list-group">
+								<li class="list-group-item" ng-repeat="groupName in scale.currentApproval.userObj.groups">{{ groupName }}</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+			<div class="row">
+				<h3>Act on Request</h3>
+
+					<div class="row">
+						<div class="col-md-4">
+							<b>Justification</b>
+						</div>
+
+						<div class="col-md-8">
+							{{ scale.currentApproval.justification }}
+						</div>
+					</div>
+					<div class="row">
+						<br />
+					</div>
+					<div class="row">
+						<div class="col-md-3"></div>
+						<div class="col-md-3">
+
+							<input type="button" class="btn btn-lg btn-success btn-block"
+								value="Confirm {{ scale.getConfirmLabel() }}" />
+
+						</div>
+						<div class="col-md-3">
+							<input type="button" class="btn btn-lg btn-danger btn-block"
+								value="Cancel {{ scale.getConfirmLabel() }}" />
+						</div>
+
+					</div>
+			</div>
+
+		</div>
 
 	</div>
+
 
 
 	<!-- jQuery (necessary for Bootstrap's JavaScript plugins) -->
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
 	<!-- Include all compiled plugins (below), or include individual files as needed -->
 	<script src="js/bootstrap.min.js"></script>
+
 	<script src="js/angular.min.js"></script>
+
 <script src="js/scale.js"></script>
+
 </body>
 </html>
