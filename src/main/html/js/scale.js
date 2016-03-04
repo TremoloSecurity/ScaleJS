@@ -16,39 +16,7 @@ limitations under the License.
 (function(){
   var app = angular.module('scale',['angularTreeview']);
 
-  var config =
-  {
-    displayNameAttribute:"cn",
-    frontPage : {
-      title : "Scale Main Page",
-      text : "Here are your apps, request access...if you dare!!!!!!"
-    },
-    canEditUser : true,
-    workflowName : "Role",
-    attributes : {
-      "uid":{
-        name : "uid",
-        displayName:"Login ID",
-        readOnly:true
-      },
-      "l":{
-        name : "l",
-        displayName:"Location",
-        readOnly:false
-      },
-      "sn": {
-        name : "sn",
-        displayName:"Last Name",
-        readOnly:true
-      },
-      "cn":{
-        name : "cn",
-        displayName:"Full Name",
-        readOnly:false
-      }
-    }
-
-  };
+  var config;
 
   var user =
     {
@@ -387,10 +355,11 @@ limitations under the License.
       angular.element(document).ready(function () {
 
         $http.get('main/config').
-          then(function(data){
+          then(function(response){
+            $scope.scale.config = response.data;
             $scope.scale.setSessionLoadedComplete();
             $scope.$apply();
-          },function(data){
+          },function(response){
             $scope.scale.appIsError = true;
             $scope.$apply();
           });
