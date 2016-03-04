@@ -38,8 +38,35 @@ limitations under the License.
 </head>
 <body ng-controller="ScaleController as scale">
 	<div class="container">
+		<div ng-show="! scale.isSessionLoaded() && scale.appIsError">
+			<div class="navbar navbar-default" role="navigation">
+			  <div class="container-fluid">
+			    <div class="navbar-header">
+			      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target=".navbar-collapse">
+			        <span class="sr-only">Toggle navigation</span>
+			        <span class="icon-bar"></span>
+			        <span class="icon-bar"></span>
+			        <span class="icon-bar"></span>
+			      </button>
+			      <img class="hidden-xs" src="images/logo-desktop.png"  width="85%" alt="scale"/>
+			      <img class="visible-xs img-responsive" src="images/logo-mobile.png" alt="scale" />
+			    </div>
+			    <div class="navbar-collapse collapse">
+			      <ul class="nav navbar-nav">
 
-		<div ng-show="! scale.isSessionLoaded()">
+						</ul>
+
+			    </div><!--/.nav-collapse -->
+			  </div><!--/.container-fluid -->
+			</div>
+			<div class="jumbotron">
+				<div class="alert alert-danger" >
+					<center><h3>Could not contact Unison</h3>
+					<b>Please try again later or contact your system administrator</b></center>
+				</div>
+			</div>
+		</div>
+		<div ng-show="! scale.isSessionLoaded() && ! scale.appIsError">
 			<div class="navbar navbar-default" role="navigation">
 			  <div class="container-fluid">
 			    <div class="navbar-header">
