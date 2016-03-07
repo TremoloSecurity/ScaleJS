@@ -18,6 +18,8 @@ limitations under the License.
 	    <meta charset="utf-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta HTTP-EQUIV="Pragma" CONTENT="no-cache">
+		<meta HTTP-EQUIV="Expires" CONTENT="-1">
     <title>Tremolo Security Scale - INSERT TITLE</title>
 
     <!-- Bootstrap -->
@@ -143,6 +145,23 @@ limitations under the License.
 		<div ng-show="scale.isSelectedTab('user')">
 	  	<h2>{{ scale.displayName() + "'s Profile" }}</h2>
 
+			<div class="row" ng-show="scale.saveUserErrors.length > 0">
+				<div class="alert alert-danger" >
+					<b>There was a problem saving
+						{{ scale.displayName() }}'s changes:</b>
+					<ul>
+							<li ng-repeat="msg in scale.saveUserErrors">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
+
+			<div class="row" ng-show="scale.saveUserSuccess">
+				<div class="alert alert-success" >
+					<b>{{ scale.displayName() }}'s changes saved successfuly.  The changes may not be reflected in your account immediately.</b>
+
+				</div>
+			</div>
+
 			<div class="row">
 					<div class="col-md-6">
 						<h3>Attributes</h3>
@@ -156,7 +175,7 @@ limitations under the License.
 										<div class="col-md-4" ng-show="attributeConfig.readOnly"><label>{{ scale.attributes[attributeConfig.name] }}</label></div>
 								</div>
 								<div  class="row">
-									<input type="button" class="btn btn-lg btn-primary" value="Save" ng-click="scale.toggleModal()" />
+									<input type="button" ng-disabled="scale.saveUserDisabled" class="btn btn-lg btn-primary" value="Save" ng-click="scale.saveUser()" />
 								</div>
 							</form>
 						</div>
@@ -531,8 +550,9 @@ limitations under the License.
 
 	</div>
 
-	<modal title="Submiting Request" visible="scale.showModal">
-     <center><h1><i class="fa fa-refresh fa-spin block"></i></h1></center>
+	<modal title="Processing" visible="scale.showModal">
+		 <center><h1>{{ scale.modalMessage }}</h1>
+     <h1><i class="fa fa-refresh fa-spin block"></i></h1></center>
    </modal>
 
 </div>

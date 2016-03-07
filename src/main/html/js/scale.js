@@ -180,9 +180,13 @@ limitations under the License.
       this.userToSave = {};
       this.currentGroups;
       this.showModal = false;
-
+      this.saveUserDisabled = false;
       this.requestAccessCurrentNode = this.orgs[0];
       this.requestAccessCurentWorkflows = this.workflows[this.requestAccessCurrentNode.id];
+      this.modalTitle;
+      this.modalMessage;
+      this.saveUserErrors = [];
+      this.saveUserSuccess = false;
 
       this.rowNumber = 0;
       this.currentApproval = approvalDetails;
@@ -384,6 +388,46 @@ limitations under the License.
           this.showModal = ! this.showModal;
       };
 
+      this.saveUser = function() {
+        this.saveUserDisabled = true;
+        this.modalTitle = "Saving...";
+        this.modalMessage = "Updating your account...";
+        this.saveUserErrors = [];
+        $scope.scale.saveUserSuccess = false;
+
+        var payload = {};
+
+        for (var attrName in this.userToSave) {
+          if (! this.config.attributes[attrName].readOnly) {
+            payload[attrName] = this.userToSave[attrName];
+          }
+        }
+
+
+        $http.post('main/user',payload).
+          then(function(response){
+            $scope.scale.user = response.data;
+            $scope.scale.loadAttributes();
+
+            $scope.scale.saveUserSuccess = true;
+            $scope.scale.saveUserDisabled = false;
+            $scope.scale.showModal = false;
+
+          },
+          function(response) {
+            $scope.scale.saveUserErrors = response.data.errors;
+            $scope.scale.saveUserDisabled = false;
+            $scope.scale.showModal = false;
+
+
+          }
+        );
+
+
+        this.toggleModal();
+
+      };
+
       angular.element(document).ready(function () {
 
         $http.get('main/config').
@@ -462,6 +506,7 @@ limitations under the License.
           }
         };
       });
+
 
 
 })();

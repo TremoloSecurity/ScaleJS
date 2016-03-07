@@ -15,10 +15,21 @@
  *******************************************************************************/
 package com.tremolosecurity.scalejs.cfg;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class ScaleAttribute {
 	String name;
 	String displayName;
 	boolean readOnly;
+	boolean required;
+	String regEx;
+	String regExFailedMsg;
+	int minChars;
+	int maxChars;
+	
+	
+	private transient Pattern pattern;
 	
 	public ScaleAttribute() {
 		
@@ -47,6 +58,52 @@ public class ScaleAttribute {
 	public void setReadOnly(boolean readOnly) {
 		this.readOnly = readOnly;
 	}
+
+	public boolean isRequired() {
+		return required;
+	}
+
+	public void setRequired(boolean required) {
+		this.required = required;
+	}
+
+	public String getRegEx() {
+		return regEx;
+	}
+
+	public void setRegEx(String regEx) {
+		this.regEx = regEx;
+		this.pattern = Pattern.compile(regEx);
+	}
+
+	public String getRegExFailedMsg() {
+		return regExFailedMsg;
+	}
+
+	public void setRegExFailedMsg(String regExFailedMsg) {
+		this.regExFailedMsg = regExFailedMsg;
+	}
+
+	public Pattern getPattern() {
+		return pattern;
+	}
+
+	public int getMinChars() {
+		return minChars;
+	}
+
+	public void setMinChars(int minChars) {
+		this.minChars = minChars;
+	}
+
+	public int getMaxChars() {
+		return maxChars;
+	}
+
+	public void setMaxChars(int maxChars) {
+		this.maxChars = maxChars;
+	}
+	
 	
 	
 }

@@ -17,16 +17,30 @@ package com.tremolosecurity.scalejs.ws;
 
 import static org.apache.directory.ldap.client.api.search.FilterBuilder.equal;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.regex.Matcher;
 
 import org.apache.log4j.Logger;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.reflect.TypeToken;
 import com.novell.ldap.LDAPAttribute;
 import com.novell.ldap.LDAPEntry;
 import com.novell.ldap.LDAPException;
 import com.novell.ldap.LDAPSearchResults;
+import com.tremolosecurity.config.util.ConfigManager;
+import com.tremolosecurity.provisioning.service.util.TremoloUser;
+import com.tremolosecurity.provisioning.service.util.WFCall;
+import com.tremolosecurity.proxy.ProxySys;
 import com.tremolosecurity.proxy.auth.AuthController;
 import com.tremolosecurity.proxy.auth.AuthInfo;
 import com.tremolosecurity.proxy.filter.HttpFilter;
@@ -38,6 +52,7 @@ import com.tremolosecurity.proxy.util.ProxyConstants;
 import com.tremolosecurity.saml.Attribute;
 import com.tremolosecurity.scalejs.cfg.ScaleAttribute;
 import com.tremolosecurity.scalejs.cfg.ScaleConfig;
+import com.tremolosecurity.scalejs.data.ScaleError;
 import com.tremolosecurity.scalejs.data.UserData;
 import com.tremolosecurity.server.GlobalEntries;
 
@@ -59,12 +74,118 @@ public class ScaleMain implements HttpFilter {
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/user")) {
 			lookupUser(request, response, gson);
 		} else if (request.getMethod().equalsIgnoreCase("POST") && request.getRequestURI().endsWith("/main/user")) {
-			lookupUser(request, response, gson);
+			
+			
+			
+			ScaleError errors = new ScaleError();
+			String json = new String( (byte[]) request.getAttribute(ProxySys.MSG_BODY));
+			
+			
+
+			
+			JsonElement root = new JsonParser().parse(json);
+			JsonObject jo = root.getAsJsonObject();
+			
+			HashMap<String,String> values = new HashMap<String,String>();
+			boolean ok = true;
+			
+			for (Entry<String,JsonElement> entry : jo.entrySet()) {
+				String attributeName = entry.getKey();
+				String value = entry.getValue().getAsJsonObject().get("value").getAsString();
+				
+				
+				
+				if (this.scaleConfig.getAttributes().get(attributeName) == null) {
+					errors.getErrors().add("Invalid attribute : '" + attributeName + "'");
+					ok = false;
+				} else if (this.scaleConfig.getAttributes().get(attributeName).isReadOnly()) {
+					errors.getErrors().add("Attribute is read only : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
+					ok = false;
+				} else if (this.scaleConfig.getAttributes().get(attributeName).isRequired() && value.length() == 0) {
+					errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
+					ok = false;
+				} else if (this.scaleConfig.getAttributes().get(attributeName).getMinChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMinChars() <= value.length()) {
+					errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at least " + this.scaleConfig.getAttributes().get(attributeName).getMinChars() + " characters");
+					ok = false;
+				} else if (this.scaleConfig.getAttributes().get(attributeName).getMaxChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMaxChars() >= value.length()) {
+					errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at most " + this.scaleConfig.getAttributes().get(attributeName).getMaxChars() + " characters");
+					ok = false;
+				} else if (this.scaleConfig.getAttributes().get(attributeName).getPattern() != null) {
+					try {
+						Matcher m = this.scaleConfig.getAttributes().get(attributeName).getPattern().matcher(value);
+						if (m == null || ! m.matches()) {
+							ok = false;
+						}
+					} catch (Exception e) {
+						ok = false;
+					}
+					
+					if (!ok) {
+						errors.getErrors().add("Attribute value not valid : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "' - " + this.scaleConfig.getAttributes().get(attributeName).getRegExFailedMsg());
+					}
+				}
+				
+				values.put(attributeName, value);
+			}
+
+			for (String attrName : this.scaleConfig.getAttributes().keySet()) {
+				if (this.scaleConfig.getAttributes().get(attrName).isRequired() && ! values.containsKey(attrName)) {
+					errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attrName).getDisplayName() + "'");
+					ok = false;
+				}
+			}
+			
+			if (ok) {
+				AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+				
+				ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+				WFCall wfCall = new WFCall();
+				wfCall.setName(this.scaleConfig.getWorkflowName());
+				wfCall.setReason("User update");
+				wfCall.setUidAttributeName(this.scaleConfig.getUidAttributeName());
+				
+				TremoloUser tu = new TremoloUser();
+				tu.setUid(userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0));
+				for (String name : values.keySet()) {
+					tu.getAttributes().add(new Attribute(name,values.get(name)));
+				}
+				
+				tu.getAttributes().add(new Attribute(this.scaleConfig.getUidAttributeName(),userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0)));
+				
+				wfCall.setUser(tu);
+				
+				try {
+					com.tremolosecurity.provisioning.workflow.ExecuteWorkflow exec = new com.tremolosecurity.provisioning.workflow.ExecuteWorkflow();
+					exec.execute(wfCall, GlobalEntries.getGlobalEntries().getConfigManager(), null);
+					lookupUser(request, response, gson);
+				} catch (Exception e) {
+					logger.error("Could not update user",e);
+					response.setStatus(500);
+					ScaleError error = new ScaleError();
+					error.getErrors().add("Please contact your system administrator");
+					response.getWriter().print(gson.toJson(error).trim());
+					response.getWriter().flush();
+				}
+				
+				
+			} else {
+				response.setStatus(500);
+				
+				response.getWriter().print(gson.toJson(errors).trim());
+				response.getWriter().flush();
+			}
+			
+			
+			
 		} 
 		
 		
 		else {
-			throw new Exception("Operation not supported");
+			response.setStatus(500);
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Operation not supported");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
 		}
 
 	}
@@ -183,6 +304,31 @@ public class ScaleMain implements HttpFilter {
 			scaleAttr.setName(attributeName);
 			scaleAttr.setDisplayName(this.loadAttributeValue(attributeName + ".displayName", attributeName + " Display Name", config));
 			scaleAttr.setReadOnly(this.loadAttributeValue(attributeName + ".readOnly", attributeName + " Read Only", config).equalsIgnoreCase("true"));
+			
+			val = this.loadOptionalAttributeValue(attributeName + ".required", attributeName + " Required", config);
+			scaleAttr.setRequired(val != null && val.equalsIgnoreCase("true"));
+			
+			val = this.loadOptionalAttributeValue(attributeName + ".regEx", attributeName + " Reg Ex", config);
+			if (val != null) {
+				scaleAttr.setRegEx(val);
+			}
+			
+			val = this.loadOptionalAttributeValue(attributeName + ".regExFailedMsg", attributeName + " Reg Ex Failed Message", config);
+			if (val != null) {
+				scaleAttr.setRegExFailedMsg(val);
+			}
+			
+			val = this.loadOptionalAttributeValue(attributeName + ".minChars", attributeName + " Minimum Characters", config);
+			if (val != null) {
+				scaleAttr.setMinChars(Integer.parseInt(val));
+			}
+			
+			val = this.loadOptionalAttributeValue(attributeName + ".mxnChars", attributeName + " Maximum Characters", config);
+			if (val != null) {
+				scaleAttr.setMaxChars(Integer.parseInt(val));
+			}
+			
+			
 			scaleConfig.getAttributes().put(attributeName, scaleAttr);
 		}
 		

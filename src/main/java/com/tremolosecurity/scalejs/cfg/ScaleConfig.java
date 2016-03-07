@@ -23,7 +23,9 @@ public class ScaleConfig {
 	String uidAttributeName;
 	ScaleFrontPage frontPage;
 	boolean canEditUser;
-	String workflowName;
+	
+	
+	transient String workflowName;
 	Map<String,ScaleAttribute> attributes;
 	String roleAttribute;
 	
