@@ -15,17 +15,31 @@
  *******************************************************************************/
 package com.tremolosecurity.scalejs.ws;
 
+import static org.apache.directory.ldap.client.api.search.FilterBuilder.equal;
+
+import java.io.IOException;
+import java.util.ArrayList;
+
 import org.apache.log4j.Logger;
 
 import com.google.gson.Gson;
+import com.novell.ldap.LDAPAttribute;
+import com.novell.ldap.LDAPEntry;
+import com.novell.ldap.LDAPException;
+import com.novell.ldap.LDAPSearchResults;
+import com.tremolosecurity.proxy.auth.AuthController;
+import com.tremolosecurity.proxy.auth.AuthInfo;
 import com.tremolosecurity.proxy.filter.HttpFilter;
 import com.tremolosecurity.proxy.filter.HttpFilterChain;
 import com.tremolosecurity.proxy.filter.HttpFilterConfig;
 import com.tremolosecurity.proxy.filter.HttpFilterRequest;
 import com.tremolosecurity.proxy.filter.HttpFilterResponse;
+import com.tremolosecurity.proxy.util.ProxyConstants;
 import com.tremolosecurity.saml.Attribute;
 import com.tremolosecurity.scalejs.cfg.ScaleAttribute;
 import com.tremolosecurity.scalejs.cfg.ScaleConfig;
+import com.tremolosecurity.scalejs.data.UserData;
+import com.tremolosecurity.server.GlobalEntries;
 
 public class ScaleMain implements HttpFilter {
 
@@ -42,10 +56,66 @@ public class ScaleMain implements HttpFilter {
 		if (request.getRequestURI().endsWith("/main/config")) {
 			response.setContentType("application/json");
 			response.getWriter().println(gson.toJson(scaleConfig).trim());
-		} else {
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/user")) {
+			lookupUser(request, response, gson);
+		} else if (request.getMethod().equalsIgnoreCase("POST") && request.getRequestURI().endsWith("/main/user")) {
+			lookupUser(request, response, gson);
+		} 
+		
+		
+		else {
 			throw new Exception("Operation not supported");
 		}
 
+	}
+
+	private void lookupUser(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws LDAPException, IOException {
+		response.setContentType("application/json");
+		
+		AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+		
+		UserData userToSend = new UserData();
+		userToSend.setDn(userData.getUserDN());
+		
+		for (String attrName : this.scaleConfig.getAttributes().keySet()) {
+			
+			
+			Attribute attr = new Attribute(attrName);
+			Attribute fromUser = userData.getAttribs().get(attrName);
+			if (fromUser != null) {
+				attr.getValues().addAll(fromUser.getValues());
+				
+				if (attrName.equalsIgnoreCase(this.scaleConfig.getUidAttributeName())) {
+					userToSend.setUid(fromUser.getValues().get(0));
+				}
+			}
+			userToSend.getAttributes().add(attr);
+		}
+		
+		if (this.scaleConfig.getRoleAttribute() != null && ! this.scaleConfig.getRoleAttribute().isEmpty()) {
+			Attribute fromUser = userData.getAttribs().get(this.scaleConfig.getRoleAttribute());
+			Attribute attr = new Attribute(this.scaleConfig.getRoleAttribute());
+			if (fromUser != null) {
+				attr.getValues().addAll(fromUser.getValues());
+			}
+			
+			userToSend.getAttributes().add(attr);
+		}
+		
+		ArrayList<String> attrNames = new ArrayList<String>();
+		attrNames.add("cn");
+		LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, equal("uniqueMember",userData.getUserDN()).toString(), attrNames);
+		
+		while (res.hasMore()) {
+			LDAPEntry entry = res.next();
+			LDAPAttribute la = entry.getAttribute("cn");
+			if (la != null) {
+				userToSend.getGroups().add(la.getStringValue());
+			}
+		}
+		
+		response.getWriter().println(gson.toJson(userToSend).trim());
 	}
 
 	@Override
@@ -75,6 +145,19 @@ public class ScaleMain implements HttpFilter {
 		return val;
 	}
 	
+	private String loadOptionalAttributeValue(String name,String label,HttpFilterConfig config) throws Exception {
+		Attribute attr = config.getAttribute(name);
+		if (attr == null) {
+			logger.warn(label + " not found");
+			return null;
+		}
+		
+		String val = attr.getValues().get(0);
+		logger.info(label + ": '" + val + "'");
+		
+		return val;
+	}
+	
 	@Override
 	public void initFilter(HttpFilterConfig config) throws Exception {
 		this.scaleConfig = new ScaleConfig();
@@ -83,6 +166,12 @@ public class ScaleMain implements HttpFilter {
 		scaleConfig.getFrontPage().setText(this.loadAttributeValue("frontPage.text", "Front Page Text", config));
 		scaleConfig.setCanEditUser(this.loadAttributeValue("canEditUser", "User Fields Editable", config).equalsIgnoreCase("true"));
 		scaleConfig.setWorkflowName(this.loadAttributeValue("workflowName", "Save User Workflow", config));
+		scaleConfig.setUidAttributeName(this.loadAttributeValue("uidAttributeName", "User ID Attribute Name", config));
+		String val = this.loadOptionalAttributeValue("roleAttribute", "Role Attribute Name", config);
+				
+		if (val != null) {
+			scaleConfig.setRoleAttribute(val);
+		}
 		
 		Attribute attr = config.getAttribute("attributeNames");
 		if (attr == null) {

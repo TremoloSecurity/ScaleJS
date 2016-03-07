@@ -20,18 +20,14 @@ limitations under the License.
 
   var user =
     {
-      "uid":"testsaml2",
-      "dn":"uid\u003dtestsaml2,ou\u003dinternal,ou\u003dGenericLDAP,o\u003dTremolo",
-      "directory":"GenericLDAP",
+      "uid":"",
+      "dn":"",
       "attributes":
         [
-          {"values":["testsaml2"],"name":"uid"},
-          {"values":["Boston"],"name":"l"},
-          {"values":["SAML2"],"name":"sn"},
-          {"values":["Test SAML2"],"name":"cn"},
-          {"values":["inetOrgPerson"],"name":"objectClass"}
+          {"values":[""],"name":"uid"},
+
         ],
-      "groups":["This is my role","and it is mine"]
+      "groups":[""]
     };
 
     var openApprovals =
@@ -106,7 +102,6 @@ limitations under the License.
         {
           "uid":"testsaml10",
           "dn":"uid\u003dtestsaml10,ou\u003dinternal,ou\u003dGenericLDAP,o\u003dTremolo",
-          "directory":"GenericLDAP",
           "attributes":
             [
               {"values":["testsaml10"],"name":"uid"},
@@ -182,6 +177,8 @@ limitations under the License.
       this.workflows = workflows;
       this.approvalSub = false;
       this.approvalConfirm = false;
+      this.userToSave = {};
+      this.currentGroups;
 
       this.requestAccessCurrentNode = this.orgs[0];
       this.requestAccessCurentWorkflows = this.workflows[this.requestAccessCurrentNode.id];
@@ -190,12 +187,42 @@ limitations under the License.
       this.currentApproval = approvalDetails;
 
       //Initialize the attributes
-      for (var i in user.attributes) {
-        this.attributes[user.attributes[i].name] = user.attributes[i].values[0];
-      }
+      //for (var i in user.attributes) {
+      //  this.attributes[user.attributes[i].name] = user.attributes[i].values[0];
+      //}
 
 
       //Methods
+      this.loadSaveAttributes = function() {
+        for (var i in this.user.attributes) {
+          this.userToSave[this.user.attributes[i].name] = {
+            name : this.user.attributes[i].name,
+            value : this.user.attributes[i].values[0]
+          };
+        };
+      } ;
+
+      this.loadAttributes = function() {
+        this.currentGroups = [];
+        for (var i in this.user.attributes) {
+          if (this.user.attributes[i].values.length > 0) {
+            this.attributes[this.user.attributes[i].name] = this.user.attributes[i].values[0];
+          }
+
+          if (this.config.roleAttribute) {
+            if (this.user.attributes[i].name === this.config.roleAttribute) {
+              this.currentGroups = this.user.attributes[i].values;
+            }
+          }
+        }
+
+        if (! this.config.roleAttribute) {
+          this.currentGroups = this.user.groups;
+        }
+
+        this.loadSaveAttributes();
+      };
+
       this.displayName = function() {
         val = this.attributes[this.config.displayNameAttribute];
         if (val == null) {
@@ -357,12 +384,23 @@ limitations under the License.
         $http.get('main/config').
           then(function(response){
             $scope.scale.config = response.data;
-            $scope.scale.setSessionLoadedComplete();
-            $scope.$apply();
+
+            $http.get('main/user').
+              then(function(response) {
+                $scope.scale.user = response.data;
+                $scope.scale.loadAttributes();
+
+                $scope.scale.setSessionLoadedComplete();
+                $scope.$apply();
+              },function(response){
+                $scope.scale.appIsError = true;
+                $scope.$apply();
+              });
           },function(response){
             $scope.scale.appIsError = true;
             $scope.$apply();
           });
+
 
 
 
@@ -372,19 +410,6 @@ limitations under the License.
 
 
 
-    app.controller('SaveUserController',function(){
-      this.userToSave = {};
-
-      for (var i in user.attributes) {
-        this.userToSave[user.attributes[i].name] = {
-          name : user.attributes[i].name,
-          value : user.attributes[i].values[0]
-        };
-
-
-
-      }
-    });
 })();
 
 (function(f){f.module("angularTreeview",[]).directive("treeModel",function($compile){return{restrict:"A",link:function(b,h,c){var a=c.treeId,g=c.treeModel,e=c.nodeLabel||"label",d=c.nodeChildren||"children",e='<ul><li data-ng-repeat="node in '+g+'"><i class="collapsed" data-ng-show="node.'+d+'.length && node.collapsed" data-ng-click="'+a+'.selectNodeHead(node)"></i><i class="expanded" data-ng-show="node.'+d+'.length && !node.collapsed" data-ng-click="'+a+'.selectNodeHead(node)"></i><i class="normal" data-ng-hide="node.'+

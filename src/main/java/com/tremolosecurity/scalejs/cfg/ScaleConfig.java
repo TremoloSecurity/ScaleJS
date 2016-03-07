@@ -20,10 +20,12 @@ import java.util.Map;
 
 public class ScaleConfig {
 	String displayNameAttribute;
+	String uidAttributeName;
 	ScaleFrontPage frontPage;
 	boolean canEditUser;
 	String workflowName;
 	Map<String,ScaleAttribute> attributes;
+	String roleAttribute;
 	
 	public ScaleConfig() {
 		this.attributes = new HashMap<String,ScaleAttribute>();
@@ -69,6 +71,23 @@ public class ScaleConfig {
 	public void setAttributes(Map<String, ScaleAttribute> attributes) {
 		this.attributes = attributes;
 	}
+
+	public String getUidAttributeName() {
+		return uidAttributeName;
+	}
+
+	public void setUidAttributeName(String uidAttributeName) {
+		this.uidAttributeName = uidAttributeName;
+	}
+
+	public String getRoleAttribute() {
+		return roleAttribute;
+	}
+
+	public void setRoleAttribute(String roleAttribute) {
+		this.roleAttribute = roleAttribute;
+	}
 	
+
 	
 }
