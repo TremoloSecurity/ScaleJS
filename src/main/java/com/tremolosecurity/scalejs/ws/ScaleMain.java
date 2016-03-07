@@ -20,6 +20,7 @@ import static org.apache.directory.ldap.client.api.search.FilterBuilder.equal;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,11 +39,17 @@ import com.novell.ldap.LDAPEntry;
 import com.novell.ldap.LDAPException;
 import com.novell.ldap.LDAPSearchResults;
 import com.tremolosecurity.config.util.ConfigManager;
+import com.tremolosecurity.config.xml.AzRuleType;
+import com.tremolosecurity.config.xml.OrgType;
+import com.tremolosecurity.provisioning.core.ProvisioningException;
+import com.tremolosecurity.provisioning.service.util.Organization;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
 import com.tremolosecurity.provisioning.service.util.WFCall;
 import com.tremolosecurity.proxy.ProxySys;
 import com.tremolosecurity.proxy.auth.AuthController;
 import com.tremolosecurity.proxy.auth.AuthInfo;
+import com.tremolosecurity.proxy.auth.AzSys;
+import com.tremolosecurity.proxy.az.AzRule;
 import com.tremolosecurity.proxy.filter.HttpFilter;
 import com.tremolosecurity.proxy.filter.HttpFilterChain;
 import com.tremolosecurity.proxy.filter.HttpFilterConfig;
@@ -74,110 +81,17 @@ public class ScaleMain implements HttpFilter {
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/user")) {
 			lookupUser(request, response, gson);
 		} else if (request.getMethod().equalsIgnoreCase("POST") && request.getRequestURI().endsWith("/main/user")) {
+			saveUser(request, response, gson);
+		}  else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/orgs")) {
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();			
+			AzSys az = new AzSys();			
+			OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+			Organization org = new Organization();
+			copyOrg(org,ot,az,userData);
+			response.setContentType("application/json");
+			response.getWriter().println(gson.toJson(org).trim());
 			
-			
-			
-			ScaleError errors = new ScaleError();
-			String json = new String( (byte[]) request.getAttribute(ProxySys.MSG_BODY));
-			
-			
-
-			
-			JsonElement root = new JsonParser().parse(json);
-			JsonObject jo = root.getAsJsonObject();
-			
-			HashMap<String,String> values = new HashMap<String,String>();
-			boolean ok = true;
-			
-			for (Entry<String,JsonElement> entry : jo.entrySet()) {
-				String attributeName = entry.getKey();
-				String value = entry.getValue().getAsJsonObject().get("value").getAsString();
-				
-				
-				
-				if (this.scaleConfig.getAttributes().get(attributeName) == null) {
-					errors.getErrors().add("Invalid attribute : '" + attributeName + "'");
-					ok = false;
-				} else if (this.scaleConfig.getAttributes().get(attributeName).isReadOnly()) {
-					errors.getErrors().add("Attribute is read only : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
-					ok = false;
-				} else if (this.scaleConfig.getAttributes().get(attributeName).isRequired() && value.length() == 0) {
-					errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
-					ok = false;
-				} else if (this.scaleConfig.getAttributes().get(attributeName).getMinChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMinChars() <= value.length()) {
-					errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at least " + this.scaleConfig.getAttributes().get(attributeName).getMinChars() + " characters");
-					ok = false;
-				} else if (this.scaleConfig.getAttributes().get(attributeName).getMaxChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMaxChars() >= value.length()) {
-					errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at most " + this.scaleConfig.getAttributes().get(attributeName).getMaxChars() + " characters");
-					ok = false;
-				} else if (this.scaleConfig.getAttributes().get(attributeName).getPattern() != null) {
-					try {
-						Matcher m = this.scaleConfig.getAttributes().get(attributeName).getPattern().matcher(value);
-						if (m == null || ! m.matches()) {
-							ok = false;
-						}
-					} catch (Exception e) {
-						ok = false;
-					}
-					
-					if (!ok) {
-						errors.getErrors().add("Attribute value not valid : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "' - " + this.scaleConfig.getAttributes().get(attributeName).getRegExFailedMsg());
-					}
-				}
-				
-				values.put(attributeName, value);
-			}
-
-			for (String attrName : this.scaleConfig.getAttributes().keySet()) {
-				if (this.scaleConfig.getAttributes().get(attrName).isRequired() && ! values.containsKey(attrName)) {
-					errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attrName).getDisplayName() + "'");
-					ok = false;
-				}
-			}
-			
-			if (ok) {
-				AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
-				
-				ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
-				WFCall wfCall = new WFCall();
-				wfCall.setName(this.scaleConfig.getWorkflowName());
-				wfCall.setReason("User update");
-				wfCall.setUidAttributeName(this.scaleConfig.getUidAttributeName());
-				
-				TremoloUser tu = new TremoloUser();
-				tu.setUid(userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0));
-				for (String name : values.keySet()) {
-					tu.getAttributes().add(new Attribute(name,values.get(name)));
-				}
-				
-				tu.getAttributes().add(new Attribute(this.scaleConfig.getUidAttributeName(),userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0)));
-				
-				wfCall.setUser(tu);
-				
-				try {
-					com.tremolosecurity.provisioning.workflow.ExecuteWorkflow exec = new com.tremolosecurity.provisioning.workflow.ExecuteWorkflow();
-					exec.execute(wfCall, GlobalEntries.getGlobalEntries().getConfigManager(), null);
-					lookupUser(request, response, gson);
-				} catch (Exception e) {
-					logger.error("Could not update user",e);
-					response.setStatus(500);
-					ScaleError error = new ScaleError();
-					error.getErrors().add("Please contact your system administrator");
-					response.getWriter().print(gson.toJson(error).trim());
-					response.getWriter().flush();
-				}
-				
-				
-			} else {
-				response.setStatus(500);
-				
-				response.getWriter().print(gson.toJson(errors).trim());
-				response.getWriter().flush();
-			}
-			
-			
-			
-		} 
+		}
 		
 		
 		else {
@@ -188,6 +102,139 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+	}
+	
+	
+	private boolean copyOrg(Organization org,OrgType ot, AzSys az, AuthInfo auinfo) throws MalformedURLException, ProvisioningException {
+		
+		ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+		
+		if (ot.getAzRules() != null && ot.getAzRules().getRule().size() > 0) {
+			ArrayList<AzRule> rules = new ArrayList<AzRule>();
+			
+			for (AzRuleType art : ot.getAzRules().getRule()) {
+				rules.add(new AzRule(art.getScope(),art.getConstraint(),art.getClassName(),cfgMgr,null));
+			}
+			
+			
+			if (! az.checkRules(auinfo,cfgMgr , rules)) {
+				return false;
+			}
+		}
+		
+		org.setId(ot.getUuid());
+		org.setName(ot.getName());
+		org.setDescription(ot.getDescription());
+		
+		for (OrgType child : ot.getOrgs()) {
+			Organization sub = new Organization();
+			
+			if (copyOrg(sub,child, az, auinfo)) {
+				org.getSubOrgs().add(sub);
+			}
+		}
+		
+		return true;
+	}
+
+	private void saveUser(HttpFilterRequest request, HttpFilterResponse response, Gson gson) throws IOException {
+		ScaleError errors = new ScaleError();
+		String json = new String( (byte[]) request.getAttribute(ProxySys.MSG_BODY));
+		
+		
+
+		
+		JsonElement root = new JsonParser().parse(json);
+		JsonObject jo = root.getAsJsonObject();
+		
+		HashMap<String,String> values = new HashMap<String,String>();
+		boolean ok = true;
+		
+		for (Entry<String,JsonElement> entry : jo.entrySet()) {
+			String attributeName = entry.getKey();
+			String value = entry.getValue().getAsJsonObject().get("value").getAsString();
+			
+			
+			
+			if (this.scaleConfig.getAttributes().get(attributeName) == null) {
+				errors.getErrors().add("Invalid attribute : '" + attributeName + "'");
+				ok = false;
+			} else if (this.scaleConfig.getAttributes().get(attributeName).isReadOnly()) {
+				errors.getErrors().add("Attribute is read only : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
+				ok = false;
+			} else if (this.scaleConfig.getAttributes().get(attributeName).isRequired() && value.length() == 0) {
+				errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "'");
+				ok = false;
+			} else if (this.scaleConfig.getAttributes().get(attributeName).getMinChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMinChars() <= value.length()) {
+				errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at least " + this.scaleConfig.getAttributes().get(attributeName).getMinChars() + " characters");
+				ok = false;
+			} else if (this.scaleConfig.getAttributes().get(attributeName).getMaxChars() > 0 && this.scaleConfig.getAttributes().get(attributeName).getMaxChars() >= value.length()) {
+				errors.getErrors().add(this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + " must have at most " + this.scaleConfig.getAttributes().get(attributeName).getMaxChars() + " characters");
+				ok = false;
+			} else if (this.scaleConfig.getAttributes().get(attributeName).getPattern() != null) {
+				try {
+					Matcher m = this.scaleConfig.getAttributes().get(attributeName).getPattern().matcher(value);
+					if (m == null || ! m.matches()) {
+						ok = false;
+					}
+				} catch (Exception e) {
+					ok = false;
+				}
+				
+				if (!ok) {
+					errors.getErrors().add("Attribute value not valid : '" + this.scaleConfig.getAttributes().get(attributeName).getDisplayName() + "' - " + this.scaleConfig.getAttributes().get(attributeName).getRegExFailedMsg());
+				}
+			}
+			
+			values.put(attributeName, value);
+		}
+
+		for (String attrName : this.scaleConfig.getAttributes().keySet()) {
+			if (this.scaleConfig.getAttributes().get(attrName).isRequired() && ! values.containsKey(attrName)) {
+				errors.getErrors().add("Attribute is required : '" + this.scaleConfig.getAttributes().get(attrName).getDisplayName() + "'");
+				ok = false;
+			}
+		}
+		
+		if (ok) {
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			
+			ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+			WFCall wfCall = new WFCall();
+			wfCall.setName(this.scaleConfig.getWorkflowName());
+			wfCall.setReason("User update");
+			wfCall.setUidAttributeName(this.scaleConfig.getUidAttributeName());
+			
+			TremoloUser tu = new TremoloUser();
+			tu.setUid(userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0));
+			for (String name : values.keySet()) {
+				tu.getAttributes().add(new Attribute(name,values.get(name)));
+			}
+			
+			tu.getAttributes().add(new Attribute(this.scaleConfig.getUidAttributeName(),userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0)));
+			
+			wfCall.setUser(tu);
+			
+			try {
+				com.tremolosecurity.provisioning.workflow.ExecuteWorkflow exec = new com.tremolosecurity.provisioning.workflow.ExecuteWorkflow();
+				exec.execute(wfCall, GlobalEntries.getGlobalEntries().getConfigManager(), null);
+				lookupUser(request, response, gson);
+			} catch (Exception e) {
+				logger.error("Could not update user",e);
+				response.setStatus(500);
+				ScaleError error = new ScaleError();
+				error.getErrors().add("Please contact your system administrator");
+				response.getWriter().print(gson.toJson(error).trim());
+				response.getWriter().flush();
+			}
+			
+			
+		} else {
+			response.setStatus(500);
+			
+			response.getWriter().print(gson.toJson(errors).trim());
+			response.getWriter().flush();
+		}
 	}
 
 	private void lookupUser(HttpFilterRequest request, HttpFilterResponse response, Gson gson)

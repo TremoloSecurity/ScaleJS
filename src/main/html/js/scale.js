@@ -136,7 +136,9 @@ limitations under the License.
         ]
     };
 
-    var workflows = {
+    var workflows = {};
+/*
+    {
       "{123-456-7890123SDF}": [
         {
         "name":"wf1",
@@ -161,6 +163,7 @@ limitations under the License.
         }
       ]
     };
+*/
 
     app.controller('ScaleController',['$compile', '$scope','$window','$http',function($compile, $scope, $window, $http){
       this.appIsError = false;
@@ -439,8 +442,19 @@ limitations under the License.
                 $scope.scale.user = response.data;
                 $scope.scale.loadAttributes();
 
-                $scope.scale.setSessionLoadedComplete();
-                $scope.$apply();
+                $http.get('main/orgs').
+                  then(function(response) {
+                    $scope.scale.orgs = [response.data];
+                    $scope.scale.setSessionLoadedComplete();
+                    $scope.$apply();
+                  },
+                  function(response) {
+                    $scope.scale.appIsError = true;
+                    $scope.$apply();
+                  }
+                )
+
+
               },function(response){
                 $scope.scale.appIsError = true;
                 $scope.$apply();
