@@ -155,8 +155,8 @@ limitations under the License.
 										<div class="col-md-4" ng-hide="attributeConfig.readOnly" ><input type="text" ng-model="scale.userToSave[attributeConfig.name].value"  aria-label="{{ attributeConfig.displayName }}"></input></div>
 										<div class="col-md-4" ng-show="attributeConfig.readOnly"><label>{{ scale.attributes[attributeConfig.name] }}</label></div>
 								</div>
-								<div class="row">
-									<input type="button" class="btn btn-lg btn-primary" value="Save" />
+								<div  class="row">
+									<input type="button" class="btn btn-lg btn-primary" value="Save" ng-click="scale.toggleModal()" />
 								</div>
 							</form>
 						</div>
@@ -530,6 +530,10 @@ limitations under the License.
 	</div>
 
 	</div>
+
+	<modal title="Submiting Request" visible="scale.showModal">
+     <center><h1><i class="fa fa-refresh fa-spin block"></i></h1></center>
+   </modal>
 
 </div>
 
