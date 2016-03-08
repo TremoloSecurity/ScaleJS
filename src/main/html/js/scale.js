@@ -190,6 +190,7 @@ limitations under the License.
       this.modalMessage;
       this.saveUserErrors = [];
       this.saveUserSuccess = false;
+      this.submitRequestsDisabled = false;
 
       this.rowNumber = 0;
       this.currentApproval = approvalDetails;
@@ -201,6 +202,50 @@ limitations under the License.
 
 
       //Methods
+
+      this.submitRequests = function() {
+        this.submitRequestsDisabled = true;
+        this.submitRequestsErrors = [];
+        $scope.scale.submitRequestSuccess = [];
+        this.modalMessage = "Submitting Requests...";
+        this.showModal = true;
+
+        wfRequests = [];
+
+        for (wfname in this.cart) {
+          wfrequest = {};
+          wfrequest.name = wfname;
+          wfrequest.reason = this.cart[wfname].reason;
+          wfRequests.push(wfrequest);
+        }
+
+        $http.put("main/workflows",wfRequests).
+          then(function(response) {
+            $scope.scale.submitRequestsErrors = [];
+            $scope.scale.submitRequestSuccess = [];
+
+            for (wfname in  response.data) {
+              if (response.data[wfname] === "success") {
+                $scope.scale.submitRequestSuccess.push($scope.scale.cart[wfname].label);
+                delete $scope.scale.cart[wfname];
+              } else {
+                msg = $scope.scale.cart[wfname].label + ' - ' + response.data[wfname];
+                $scope.scale.submitRequestsErrors.push(msg);
+              }
+            }
+
+            $scope.scale.showModal = false;
+            $scope.scale.submitRequestsDisabled = false;
+          },
+          function(response) {
+            $scope.scale.submitRequestsErrors = response.data.errors;
+            $scope.scale.showModal = false;
+            $scope.scale.submitRequestsDisabled = false;
+          }
+        )
+
+      }
+
       this.loadSaveAttributes = function() {
         for (var i in this.user.attributes) {
           this.userToSave[this.user.attributes[i].name] = {
@@ -295,10 +340,12 @@ limitations under the License.
       this.toggleWorkflow = function(workflow) {
         if (workflow.inCart) {
           workflow.inCart = false;
+          workflow.reason = "";
           delete this.cart[workflow.name];
         } else {
           workflow.inCart = true;
           this.cart[workflow.name] = workflow;
+          this.cart[workflow.name].reason = "";
         }
       };
 
@@ -423,7 +470,7 @@ limitations under the License.
         }
 
 
-        $http.post('main/user',payload).
+        $http.put('main/user',payload).
           then(function(response){
             $scope.scale.user = response.data;
             $scope.scale.loadAttributes();

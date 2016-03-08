@@ -67,6 +67,7 @@ import com.tremolosecurity.scalejs.cfg.ScaleAttribute;
 import com.tremolosecurity.scalejs.cfg.ScaleConfig;
 import com.tremolosecurity.scalejs.data.ScaleError;
 import com.tremolosecurity.scalejs.data.UserData;
+import com.tremolosecurity.scalejs.data.WorkflowRequest;
 import com.tremolosecurity.server.GlobalEntries;
 
 public class ScaleMain implements HttpFilter {
@@ -91,7 +92,7 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().println(gson.toJson(scaleConfig).trim());
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/user")) {
 			lookupUser(request, response, gson);
-		} else if (request.getMethod().equalsIgnoreCase("POST") && request.getRequestURI().endsWith("/main/user")) {
+		} else if (request.getMethod().equalsIgnoreCase("PUT") && request.getRequestURI().endsWith("/main/user")) {
 			saveUser(request, response, gson);
 		}  else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/orgs")) {
 			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();			
@@ -103,50 +104,10 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().println(gson.toJson(org).trim());
 			
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/workflows/org/")) {
-			String orgid = request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1);
-			ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
-			HashSet<String> allowedOrgs = new HashSet<String>();
-			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
-			OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
-			AzSys az = new AzSys();			
-			this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+			loadWorkflows(request, response, gson);
 			
-			if (! allowedOrgs.contains(orgid)) {
-				response.setStatus(401);
-				response.setContentType("application/json");
-				ScaleError error = new ScaleError();
-				error.getErrors().add("Unauthorized");
-				response.getWriter().print(gson.toJson(error).trim());
-				response.getWriter().flush();
-			} else {
-				List<WorkflowType> wfs = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow();
-				
-				ArrayList<WFDescription> workflows = new ArrayList<WFDescription>();
-				
-				for (WorkflowType wf : wfs) {
-					
-					if (wf.isInList() != null && wf.isInList().booleanValue()) {
-						
-						if ( wf.getOrgid() == null || wf.getOrgid().equalsIgnoreCase(orgid)) { 
-						
-							WFDescription desc = new WFDescription();
-							
-							desc.setName(wf.getName());
-							desc.setLabel(wf.getLabel());
-							desc.setDescription(wf.getDescription());
-							
-							
-							workflows.add(desc);
-						}
-					}
-					
-				}
-				
-				response.setContentType("application/json");
-				response.getWriter().println(gson.toJson(workflows).trim());
-				response.getWriter().flush();
-			}
-			
+		} else if (request.getMethod().equalsIgnoreCase("PUT") && request.getRequestURI().endsWith("/main/workflows")) {
+			executeWorkflows(request, response, gson);
 		}
 		
 		
@@ -158,6 +119,116 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+	}
+
+
+	private void executeWorkflows(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws MalformedURLException, ProvisioningException, IOException {
+		Type listType = new TypeToken<ArrayList<WorkflowRequest>>() {}.getType();
+		List<WorkflowRequest> reqs = gson.fromJson(new String((byte[])request.getAttribute(ProxySys.MSG_BODY)), listType);
+		HashMap<String,String> results = new HashMap<String,String>();
+		
+		for (WorkflowRequest req : reqs) {
+			if (req.getReason() == null || req.getReason().isEmpty()) {
+				results.put(req.getName(), "Reason is required");
+			} else {
+				
+				HashSet<String> allowedOrgs = new HashSet<String>();
+				AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+				OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+				AzSys az = new AzSys();			
+				this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+				
+				String orgid = null;
+				
+				List<WorkflowType> wfs = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow();
+				for (WorkflowType wf : wfs) {
+					if (wf.getName().equals(req.getName())) {
+						orgid = wf.getOrgid();
+						break;
+					}
+				}
+				
+				if (orgid == null) {
+					results.put(req.getName(), "Not Found");
+				} else if (! allowedOrgs.contains(orgid)) {
+					results.put(req.getName(), "Unauthorized");
+				} else {
+					WFCall wfCall = new WFCall();
+					wfCall.setName(req.getName());
+					wfCall.setReason(req.getReason());
+					wfCall.setUidAttributeName(this.scaleConfig.getUidAttributeName());
+					
+					TremoloUser tu = new TremoloUser();
+					tu.setUid(userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0));
+					tu.getAttributes().add(new Attribute(this.scaleConfig.getUidAttributeName(),userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0)));
+					
+					wfCall.setUser(tu);
+					
+					try {
+						com.tremolosecurity.provisioning.workflow.ExecuteWorkflow exec = new com.tremolosecurity.provisioning.workflow.ExecuteWorkflow();
+						exec.execute(wfCall, GlobalEntries.getGlobalEntries().getConfigManager(), null);
+						results.put(req.getName(), "success");
+					} catch (Exception e) {
+						logger.error("Could not update user",e);
+						results.put(req.getName(), "Error, please contact your system administrator");
+					}
+				}
+				
+				
+			}
+		}
+		
+		response.setContentType("application/json");
+		response.getWriter().println(gson.toJson(results).trim());
+	}
+
+
+	private void loadWorkflows(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws MalformedURLException, ProvisioningException, IOException {
+		String orgid = request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1);
+		ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+		HashSet<String> allowedOrgs = new HashSet<String>();
+		AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+		OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+		AzSys az = new AzSys();			
+		this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+		
+		if (! allowedOrgs.contains(orgid)) {
+			response.setStatus(401);
+			response.setContentType("application/json");
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Unauthorized");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+		} else {
+			List<WorkflowType> wfs = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow();
+			
+			ArrayList<WFDescription> workflows = new ArrayList<WFDescription>();
+			
+			for (WorkflowType wf : wfs) {
+				
+				if (wf.isInList() != null && wf.isInList().booleanValue()) {
+					
+					if ( wf.getOrgid() == null || wf.getOrgid().equalsIgnoreCase(orgid)) { 
+					
+						WFDescription desc = new WFDescription();
+						
+						desc.setName(wf.getName());
+						desc.setLabel(wf.getLabel());
+						desc.setDescription(wf.getDescription());
+						
+						
+						workflows.add(desc);
+					}
+				}
+				
+			}
+			
+			response.setContentType("application/json");
+			response.getWriter().println(gson.toJson(workflows).trim());
+			response.getWriter().flush();
+		}
 	}
 	
 	

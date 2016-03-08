@@ -260,6 +260,24 @@ limitations under the License.
 						{{ scale.displayName() }} does not have any open requests. Click
 						"Request Access" to make requests.</div>
 
+			<div class="row" ng-show="scale.submitRequestsErrors && scale.submitRequestsErrors.length > 0">
+				<div class="alert alert-danger" >
+					<b>There was a problem submitting {{ scale.displayName() }}'s requests : </b>
+					<ul>
+							<li ng-repeat="msg in scale.submitRequestsErrors">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
+
+			<div class="row" ng-show="scale.submitRequestSuccess && scale.submitRequestSuccess.length > 0">
+				<div class="alert alert-success" >
+					<b>There following requests were successfully submitted : </b>
+					<ul>
+							<li ng-repeat="msg in scale.submitRequestSuccess">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
+
 			<div class="row"  ng-repeat="wf in scale.cart" ng-class-odd="'row-odd'" ng-class-even="'row-even'">
 				<div class="col-md-3">
 				  <a href ng-click="scale.toggleWorkflow(wf)">Remove From Cart</a>
@@ -268,8 +286,12 @@ limitations under the License.
 				<div class="col-md-3">{{ wf.label }}</div>
 				<div class="col-md-3">{{ wf.description }}</div>
 				<div class="col-md-3">
-				  <input type="text" ng-value="{{ wf.reason }}" placeholder="Supply Reason" required="true" aria-label="Reason for request"></input>
+				  <input type="text" ng-model="wf.reason" placeholder="Supply Reason" required="true" aria-label="Reason for request"></input>
 				</div>
+			</div>
+
+			<div class="row" ng-show="! scale.isCartEmpty()">
+					<input type="button" ng-disabled="scale.submitRequestsDisabled" ng-click="scale.submitRequests()" class="btn btn-lg btn-primary" value="Submit Request"  />
 			</div>
 		</div>
 
