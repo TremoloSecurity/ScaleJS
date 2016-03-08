@@ -23,9 +23,12 @@ import java.lang.reflect.Type;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.regex.Matcher;
+
+import javax.servlet.http.HttpSession;
 
 import org.apache.log4j.Logger;
 
@@ -39,12 +42,15 @@ import com.novell.ldap.LDAPEntry;
 import com.novell.ldap.LDAPException;
 import com.novell.ldap.LDAPSearchResults;
 import com.tremolosecurity.config.util.ConfigManager;
+import com.tremolosecurity.config.xml.ApplicationType;
 import com.tremolosecurity.config.xml.AzRuleType;
 import com.tremolosecurity.config.xml.OrgType;
+import com.tremolosecurity.config.xml.WorkflowType;
 import com.tremolosecurity.provisioning.core.ProvisioningException;
 import com.tremolosecurity.provisioning.service.util.Organization;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
 import com.tremolosecurity.provisioning.service.util.WFCall;
+import com.tremolosecurity.provisioning.service.util.WFDescription;
 import com.tremolosecurity.proxy.ProxySys;
 import com.tremolosecurity.proxy.auth.AuthController;
 import com.tremolosecurity.proxy.auth.AuthInfo;
@@ -68,12 +74,17 @@ public class ScaleMain implements HttpFilter {
 	static Logger logger = Logger.getLogger(ScaleMain.class.getName());
 	
 	ScaleConfig scaleConfig;
+	ApplicationType appType;
 	
 	
 	@Override
 	public void doFilter(HttpFilterRequest request, HttpFilterResponse response, HttpFilterChain chain)
 			throws Exception {
 		Gson gson = new Gson();
+		
+		
+		
+		
 		
 		if (request.getRequestURI().endsWith("/main/config")) {
 			response.setContentType("application/json");
@@ -90,6 +101,51 @@ public class ScaleMain implements HttpFilter {
 			copyOrg(org,ot,az,userData);
 			response.setContentType("application/json");
 			response.getWriter().println(gson.toJson(org).trim());
+			
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/workflows/org/")) {
+			String orgid = request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1);
+			ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+			HashSet<String> allowedOrgs = new HashSet<String>();
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+			AzSys az = new AzSys();			
+			this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+			
+			if (! allowedOrgs.contains(orgid)) {
+				response.setStatus(401);
+				response.setContentType("application/json");
+				ScaleError error = new ScaleError();
+				error.getErrors().add("Unauthorized");
+				response.getWriter().print(gson.toJson(error).trim());
+				response.getWriter().flush();
+			} else {
+				List<WorkflowType> wfs = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow();
+				
+				ArrayList<WFDescription> workflows = new ArrayList<WFDescription>();
+				
+				for (WorkflowType wf : wfs) {
+					
+					if (wf.isInList() != null && wf.isInList().booleanValue()) {
+						
+						if ( wf.getOrgid() == null || wf.getOrgid().equalsIgnoreCase(orgid)) { 
+						
+							WFDescription desc = new WFDescription();
+							
+							desc.setName(wf.getName());
+							desc.setLabel(wf.getLabel());
+							desc.setDescription(wf.getDescription());
+							
+							
+							workflows.add(desc);
+						}
+					}
+					
+				}
+				
+				response.setContentType("application/json");
+				response.getWriter().println(gson.toJson(workflows).trim());
+				response.getWriter().flush();
+			}
 			
 		}
 		
@@ -337,6 +393,10 @@ public class ScaleMain implements HttpFilter {
 		scaleConfig.setUidAttributeName(this.loadAttributeValue("uidAttributeName", "User ID Attribute Name", config));
 		String val = this.loadOptionalAttributeValue("roleAttribute", "Role Attribute Name", config);
 				
+		
+		this.appType = new ApplicationType();
+		this.appType.setAzTimeoutMillis((long) 3000);
+		
 		if (val != null) {
 			scaleConfig.setRoleAttribute(val);
 		}
@@ -379,6 +439,29 @@ public class ScaleMain implements HttpFilter {
 			scaleConfig.getAttributes().put(attributeName, scaleAttr);
 		}
 		
+	}
+	
+	private void checkOrg(HashSet<String> allowedOrgs,OrgType ot, AzSys az, AuthInfo auinfo,HttpSession session) throws MalformedURLException, ProvisioningException {
+		ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+		
+		if (ot.getAzRules() != null && ot.getAzRules().getRule().size() > 0) {
+			ArrayList<AzRule> rules = new ArrayList<AzRule>();
+			
+			for (AzRuleType art : ot.getAzRules().getRule()) {
+				rules.add(new AzRule(art.getScope(),art.getConstraint(),art.getClassName(),cfgMgr,null));
+			}
+			
+			
+			if (! az.checkRules(auinfo, cfgMgr, rules,session, this.appType)) {
+				return;
+			}
+		}
+		
+		allowedOrgs.add(ot.getUuid());
+		
+		for (OrgType child : ot.getOrgs()) {
+			checkOrg(allowedOrgs,child, az, auinfo,session);
+		}
 	}
 
 }

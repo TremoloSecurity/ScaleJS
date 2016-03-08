@@ -210,6 +210,14 @@ limitations under the License.
 
 		<div ng-show="scale.isSelectedTab('requestAccess')">
 	  	<h2>Request Access to Applications</h2>
+			<div class="row" ng-show="scale.loadWorkflowsErrors && scale.loadWorkflowsErrors.length > 0">
+				<div class="alert alert-danger" >
+					<b>There was a problem loading available requests : </b>
+					<ul>
+							<li ng-repeat="msg in scale.loadWorkflowsErrors">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
 			<div class="row">
 				<div class="col-md-6">
 					<div

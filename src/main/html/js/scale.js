@@ -252,7 +252,23 @@ limitations under the License.
 
       this.selectRequestAccessOrg = function(node) {
         this.requestAccessCurrentNode = node;
-        this.requestAccessCurentWorkflows = this.workflows[this.requestAccessCurrentNode.id];
+        this.loadWorkflowsErrors = [];
+
+        $http.get('main/workflows/org/' + this.requestAccessCurrentNode.id).
+          then(function(response) {
+            $scope.scale.workflows[$scope.scale.requestAccessCurrentNode.id] = response.data;
+            $scope.scale.requestAccessCurentWorkflows = $scope.scale.workflows[$scope.scale.requestAccessCurrentNode.id];
+          },
+          function(response) {
+            $scope.scale.loadWorkflowsErrors = response.data.errors;
+            $scope.scale.requestAccessCurentWorkflows = [];
+
+          }
+        );
+
+
+
+
       };
 
       this.isWorkflowCompleted = function(name) {
