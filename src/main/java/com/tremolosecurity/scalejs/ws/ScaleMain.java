@@ -47,10 +47,15 @@ import com.tremolosecurity.config.xml.AzRuleType;
 import com.tremolosecurity.config.xml.OrgType;
 import com.tremolosecurity.config.xml.WorkflowType;
 import com.tremolosecurity.provisioning.core.ProvisioningException;
+import com.tremolosecurity.provisioning.service.util.ApprovalDetails;
+import com.tremolosecurity.provisioning.service.util.ApprovalSummaries;
+import com.tremolosecurity.provisioning.service.util.ApprovalSummary;
 import com.tremolosecurity.provisioning.service.util.Organization;
+import com.tremolosecurity.provisioning.service.util.ServiceActions;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
 import com.tremolosecurity.provisioning.service.util.WFCall;
 import com.tremolosecurity.provisioning.service.util.WFDescription;
+import com.tremolosecurity.provisioning.workflow.ApprovalData;
 import com.tremolosecurity.proxy.ProxySys;
 import com.tremolosecurity.proxy.auth.AuthController;
 import com.tremolosecurity.proxy.auth.AuthInfo;
@@ -65,6 +70,7 @@ import com.tremolosecurity.proxy.util.ProxyConstants;
 import com.tremolosecurity.saml.Attribute;
 import com.tremolosecurity.scalejs.cfg.ScaleAttribute;
 import com.tremolosecurity.scalejs.cfg.ScaleConfig;
+import com.tremolosecurity.scalejs.data.ScaleApprovalData;
 import com.tremolosecurity.scalejs.data.ScaleError;
 import com.tremolosecurity.scalejs.data.UserData;
 import com.tremolosecurity.scalejs.data.WorkflowRequest;
@@ -108,6 +114,49 @@ public class ScaleMain implements HttpFilter {
 			
 		} else if (request.getMethod().equalsIgnoreCase("PUT") && request.getRequestURI().endsWith("/main/workflows")) {
 			executeWorkflows(request, response, gson);
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/approvals")) {
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			String uid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0); 			
+			response.setContentType("application/json");
+			response.getWriter().println(gson.toJson(ServiceActions.listOpenApprovals(uid)).trim());			
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/approvals/")) {
+			loadApproval(request, response, gson);
+			
+						
+		} else if (request.getMethod().equalsIgnoreCase("PUT") && request.getRequestURI().contains("/main/approvals/")) {
+			int approvalID = Integer.parseInt(request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1));
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			String uid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0);
+			boolean ok = false;
+			ApprovalSummaries summaries = ServiceActions.listOpenApprovals(uid);
+			for (ApprovalSummary as : summaries.getApprovals()) {
+				if (as.getApproval() == approvalID) {
+					ok = true;
+				}
+			}
+			
+			if (! ok) {
+				response.setStatus(401);
+				response.setContentType("application/json");
+				ScaleError error = new ScaleError();
+				error.getErrors().add("Unauthorized");
+				response.getWriter().print(gson.toJson(error).trim());
+				response.getWriter().flush();
+			} else {
+				ScaleApprovalData approvalData = gson.fromJson(new String((byte[]) request.getAttribute(ProxySys.MSG_BODY)), ScaleApprovalData.class);
+				try {
+					GlobalEntries.getGlobalEntries().getConfigManager().getProvisioningEngine().doApproval(approvalID, uid, approvalData.isApproved(),approvalData.getReason());
+				} catch (Exception e) {
+					logger.error("Could not execute approval",e);
+					response.setStatus(500);
+					ScaleError error = new ScaleError();
+					error.getErrors().add("There was a problem completeding your request, please contact your system administrator");
+					response.getWriter().print(gson.toJson(error).trim());
+					response.getWriter().flush();
+				}
+			}
+			
+						
 		}
 		
 		
@@ -119,6 +168,90 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+	}
+
+
+	private void loadApproval(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws ProvisioningException, IOException, LDAPException {
+		int approvalID = Integer.parseInt(request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1));
+		AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+		String uid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0);
+		boolean ok = false;
+		ApprovalSummaries summaries = ServiceActions.listOpenApprovals(uid);
+		for (ApprovalSummary as : summaries.getApprovals()) {
+			if (as.getApproval() == approvalID) {
+				ok = true;
+			}
+		}
+		
+		if (! ok) {
+			response.setStatus(401);
+			response.setContentType("application/json");
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Unauthorized");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+		} else {
+			response.setContentType("application/json");
+			
+			
+			ApprovalDetails details = ServiceActions.loadApprovalDetails(uid, approvalID);
+			
+			String filter = equal(this.scaleConfig.getUidAttributeName(),details.getUserObj().getUserID()).toString();
+			ArrayList<String> attrs = new ArrayList<String>();
+			for (String attrName : this.scaleConfig.getApprovalAttributes().keySet()) {
+				attrs.add(attrName);
+			}
+			
+			if (this.scaleConfig.getRoleAttribute() != null && ! this.scaleConfig.getRoleAttribute().isEmpty()) {
+				attrs.add(this.scaleConfig.getRoleAttribute());
+			}
+			
+			LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, filter, attrs);
+			
+			if (res.hasMore()) {
+				LDAPEntry entry = res.next();
+				details.getUserObj().getAttribs().clear();
+				
+				for (String attrName : this.scaleConfig.getApprovalAttributes().keySet()) {
+					LDAPAttribute attr = entry.getAttribute(attrName);
+					if (attr != null) {
+						details.getUserObj().getAttribs().put(scaleConfig.getApprovalAttributes().get(attrName).getDisplayName(), new Attribute(scaleConfig.getApprovalAttributes().get(attrName).getDisplayName(),attr.getStringValue()));
+					}
+				}
+				
+				if (this.scaleConfig.getRoleAttribute() != null && ! this.scaleConfig.getRoleAttribute().isEmpty()) {
+					LDAPAttribute attr = entry.getAttribute(this.scaleConfig.getRoleAttribute());
+					if (attr != null) {
+						details.getUserObj().getGroups().clear();
+						for (String val : attr.getStringValueArray()) {
+							details.getUserObj().getGroups().add(val);
+						}
+					}
+				} else {
+					details.getUserObj().getGroups().clear();
+					ArrayList<String> attrNames = new ArrayList<String>();
+					attrNames.add("cn");
+					LDAPSearchResults res2 = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, equal("uniqueMember",entry.getDN()).toString(), attrNames);
+					
+					while (res2.hasMore()) {
+						LDAPEntry entry2 = res2.next();
+						LDAPAttribute la = entry2.getAttribute("cn");
+						if (la != null) {
+							details.getUserObj().getGroups().add(la.getStringValue());
+						}
+					}
+				}
+				
+				
+			}
+			
+			while (res.hasMore()) res.next();
+			
+					
+			response.getWriter().println(gson.toJson(details).trim());
+			response.getWriter().flush();
+		}
 	}
 
 
@@ -508,6 +641,19 @@ public class ScaleMain implements HttpFilter {
 			
 			
 			scaleConfig.getAttributes().put(attributeName, scaleAttr);
+		}
+		
+		
+		attr = config.getAttribute("approvalAttributeNames");
+		if (attr == null) {
+			throw new Exception("Approval attribute names not found");
+		}
+		
+		for (String attributeName : attr.getValues()) {
+			ScaleAttribute scaleAttr = new ScaleAttribute();
+			scaleAttr.setName(attributeName);
+			scaleAttr.setDisplayName(this.loadAttributeValue("approvals." + attributeName, "Approvals attribute " + attributeName + " Display Name", config));
+			scaleConfig.getApprovalAttributes().put(attributeName, scaleAttr);
 		}
 		
 	}

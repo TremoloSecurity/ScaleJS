@@ -285,6 +285,15 @@ limitations under the License.
         }
       };
 
+      this.currentApprovalDisplayName = function() {
+        val = this.currentApproval.userObj.userID;
+        if (val == null) {
+          return "No User Loaded";
+        } else {
+          return val;
+        }
+      };
+
       this.isSelectedTab = function(val) {
         return val == this.currentTab;
       };
@@ -388,10 +397,32 @@ limitations under the License.
       };
 
       this.reviewApproval = function(approval) {
-        this.approvalSub = true;
-        this.approvalConfirm = false;
-        this.approvalError = false;
-        this.approvalErrors = [];
+
+
+        this.currentApproval = {};
+        this.modalMessage = "Loading Approval...";
+        this.showModal = true;
+
+        this.approvalConfirmDisabled = false;
+        this.approvalSuccess = false;
+        this.approvalFailure = false;
+
+        $http.get('main/approvals/' + approval.approval).
+          then(function(response) {
+            $scope.scale.currentApproval = response.data;
+            $scope.scale.approvalSub = true;
+            $scope.scale.approvalConfirm = false;
+            $scope.scale.approvalError = false;
+            $scope.scale.approvalErrors = [];
+            $scope.scale.showModal = false;
+
+          },
+          function(response) {
+            alert(response.data);
+          }
+        );
+
+
       };
 
       this.isApprovalSub = function() {
@@ -428,6 +459,52 @@ limitations under the License.
           this.approvalConfirm = true;
           this.currentApproval.isApproved = false;
         }
+      }
+
+      this.cancelApproval = function() {
+        this.approvalConfirm = false;
+        this.approvalError = false;
+        this.approvalErrors = [];
+      }
+
+      this.finishApproval = function() {
+        var approvalData = {};
+        approvalData.reason = this.currentApproval.reason;
+        approvalData.approved = this.currentApproval.isApproved;
+        this.approvalConfirmDisabled = true;
+        this.approvalSuccess = false;
+        this.approvalFailure = false;
+
+        this.modalMessage = "Submitting Decision...";
+        this.showModal = true;
+
+        $http.put('main/approvals/' + this.currentApproval.approval,approvalData).
+          then(function(response){
+            //don't care about the response as long as its 200
+            $http.get('main/approvals').
+              then(function(response) {
+                  $scope.scale.approvals = response.data.approvals;
+
+                  $scope.scale.approvalConfirmDisabled = true;
+                  $scope.scale.approvalSuccess = true;
+                  $scope.scale.approvalFailure = false;
+                  $scope.scale.showModal = false;
+              },
+              function(response) {
+                $scope.scale.approvalConfirmDisabled = false;
+                $scope.scale.approvalSuccess = false;
+                $scope.scale.approvalFailure = true;
+                $scope.scale.showModal = false;
+              }
+            );
+          },
+          function (response) {
+            $scope.scale.approvalConfirmDisabled = false;
+            $scope.scale.approvalSuccess = false;
+            $scope.scale.approvalFailure = true;
+            $scope.scale.showModal = false;
+          }
+        );
       }
 
       this.isApprovalError = function() {
@@ -508,8 +585,21 @@ limitations under the License.
                 $http.get('main/orgs').
                   then(function(response) {
                     $scope.scale.orgs = [response.data];
-                    $scope.scale.setSessionLoadedComplete();
-                    $scope.$apply();
+
+
+                    $http.get('main/approvals').
+                      then(function(response) {
+                          $scope.scale.approvals = response.data.approvals;
+                          $scope.scale.setSessionLoadedComplete();
+                          $scope.$apply();
+                      },
+                      function(response) {
+                        $scope.scale.appIsError = true;
+                        $scope.$apply();
+                      }
+                    );
+
+
                   },
                   function(response) {
                     $scope.scale.appIsError = true;

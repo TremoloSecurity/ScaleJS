@@ -318,7 +318,7 @@ limitations under the License.
 			<div class="row" ng-show="scale.isApprovalError()">
 				<div class="alert alert-danger" >
 					<b>There was a problem acting on
-						{{ scale.currentApproval.userObj.displayName }}'s request:</b>
+						{{ scale.currentApprovalDisplayName() }}'s request:</b>
 					<ul>
 							<li ng-repeat="msg in scale.approvalErrors">{{ msg }}</li>
 					</ul>
@@ -330,7 +330,7 @@ limitations under the License.
 					<div class="col-md-4">
 						<b>Subject</b>
 					</div>
-					<div class="col-md-8">{{ scale.currentApproval.userObj.displayName }}</div>
+					<div class="col-md-8">{{ scale.currentApprovalDisplayName() }}</div>
 				</div>
 
 				<div class="row">
@@ -391,7 +391,7 @@ limitations under the License.
 					<div class="row" ng-repeat="attr in scale.currentApproval.userObj.attribs">
 
 							<div class="col-md-4">
-								<b>{{ attr.label }}</b>
+								<b>{{ attr.name }}</b>
 							</div>
 							<div class="col-md-4">{{ attr.values[0] }}</div>
 
@@ -436,12 +436,12 @@ limitations under the License.
 						<div class="col-md-3">
 
 							<input type="button" class="btn btn-lg btn-success btn-block"
-								value="Approve Request" ng-click="scale.confirmApproval()"/>
+								value="Approve Request" ng-click="scale.confirmApproval()" />
 
 						</div>
 						<div class="col-md-3">
 							<input type="button" class="btn btn-lg btn-danger btn-block"
-								value="Deny Request" ng-click="scale.confirmDenial()" />
+								value="Deny Request" ng-click="scale.confirmDenial()"  />
 						</div>
 
 					</div>
@@ -453,11 +453,27 @@ limitations under the License.
 		<div ng-show="scale.isSelectedTab('approvals') && scale.isApprovalSub() && scale.isApprovalConfirm()">
 			<div class="row">
 				<h3>Request Details</h3>
+
+				<div class="row" ng-show="scale.approvalFailure">
+					<div class="alert alert-danger" >
+						<b>There was a problem acting on
+							{{ scale.currentApprovalDisplayName() }}'s request, please try again later or contact a system administrator</b>
+					</div>
+				</div>
+
+				<div class="row" ng-show="scale.approvalSuccess">
+					<div class="alert alert-success" >
+						<b>Your {{ scale.getConfirmLabel() }} of {{ scale.currentApprovalDisplayName() }}'s request was successfully submitted</b>
+					</div>
+				</div>
+
+
+
 				<div class="row">
 					<div class="col-md-4">
 						<b>Subject</b>
 					</div>
-					<div class="col-md-8">{{ scale.currentApproval.userObj.displayName }}</div>
+					<div class="col-md-8">{{ scale.currentApprovalDisplayName() }}</div>
 				</div>
 
 				<div class="row">
@@ -518,7 +534,7 @@ limitations under the License.
 					<div class="row" ng-repeat="attr in scale.currentApproval.userObj.attribs">
 
 							<div class="col-md-4">
-								<b>{{ attr.label }}</b>
+								<b>{{ attr.name }}</b>
 							</div>
 							<div class="col-md-4">{{ attr.values[0] }}</div>
 
@@ -562,13 +578,13 @@ limitations under the License.
 						<div class="col-md-3"></div>
 						<div class="col-md-3">
 
-							<input type="button" class="btn btn-lg btn-success btn-block"
-								value="Confirm {{ scale.getConfirmLabel() }}" />
+							<input type="button" class="btn btn-lg btn-info btn-block"
+								value="Confirm {{ scale.getConfirmLabel() }}" ng-hide="scale.approvalConfirmDisabled" ng-click="scale.finishApproval()"/>
 
 						</div>
 						<div class="col-md-3">
-							<input type="button" class="btn btn-lg btn-danger btn-block"
-								value="Cancel {{ scale.getConfirmLabel() }}" />
+							<input type="button" class="btn btn-lg btn-warning btn-block"
+								value="Cancel {{ scale.getConfirmLabel() }}" ng-hide="scale.approvalConfirmDisabled" ng-click="scale.cancelApproval()"/>
 						</div>
 
 					</div>

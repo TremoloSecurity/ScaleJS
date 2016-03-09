@@ -27,10 +27,12 @@ public class ScaleConfig {
 	
 	transient String workflowName;
 	Map<String,ScaleAttribute> attributes;
+	transient Map<String,ScaleAttribute> approvalAttributes;
 	String roleAttribute;
 	
 	public ScaleConfig() {
 		this.attributes = new HashMap<String,ScaleAttribute>();
+		this.approvalAttributes = new HashMap<String,ScaleAttribute>();
 		this.frontPage = new ScaleFrontPage();
 	}
 
@@ -89,6 +91,11 @@ public class ScaleConfig {
 	public void setRoleAttribute(String roleAttribute) {
 		this.roleAttribute = roleAttribute;
 	}
+
+	public Map<String, ScaleAttribute> getApprovalAttributes() {
+		return approvalAttributes;
+	}
+	
 	
 
 	
