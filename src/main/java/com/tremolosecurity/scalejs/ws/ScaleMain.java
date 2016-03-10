@@ -45,12 +45,16 @@ import com.tremolosecurity.config.util.ConfigManager;
 import com.tremolosecurity.config.xml.ApplicationType;
 import com.tremolosecurity.config.xml.AzRuleType;
 import com.tremolosecurity.config.xml.OrgType;
+import com.tremolosecurity.config.xml.ReportType;
+import com.tremolosecurity.config.xml.ReportsType;
 import com.tremolosecurity.config.xml.WorkflowType;
 import com.tremolosecurity.provisioning.core.ProvisioningException;
 import com.tremolosecurity.provisioning.service.util.ApprovalDetails;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummaries;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummary;
 import com.tremolosecurity.provisioning.service.util.Organization;
+import com.tremolosecurity.provisioning.service.util.ReportInformation;
+import com.tremolosecurity.provisioning.service.util.ReportsList;
 import com.tremolosecurity.provisioning.service.util.ServiceActions;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
 import com.tremolosecurity.provisioning.service.util.WFCall;
@@ -157,6 +161,9 @@ public class ScaleMain implements HttpFilter {
 			}
 			
 						
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/org/")) {
+			loadReports(request, response, gson);
+			
 		}
 		
 		
@@ -360,6 +367,51 @@ public class ScaleMain implements HttpFilter {
 			
 			response.setContentType("application/json");
 			response.getWriter().println(gson.toJson(workflows).trim());
+			response.getWriter().flush();
+		}
+	}
+	
+	private void loadReports(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws MalformedURLException, ProvisioningException, IOException {
+		String orgid = request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1);
+		ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
+		HashSet<String> allowedOrgs = new HashSet<String>();
+		AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+		OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+		AzSys az = new AzSys();			
+		this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+		
+		if (! allowedOrgs.contains(orgid)) {
+			response.setStatus(401);
+			response.setContentType("application/json");
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Unauthorized");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+		} else {
+			
+			ReportsType reports = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getReports();
+			
+			ReportsList reportsList = new ReportsList();
+			reportsList.setReports(new ArrayList<ReportInformation>());
+			
+			
+			for (ReportType report : reports.getReport()) {
+				if (report.getOrgID().equals(orgid)) {
+					ReportInformation ri = new ReportInformation();
+					ri.setName(report.getName());
+					ri.setDescription(report.getDescription());
+					ri.setOrgID(report.getOrgID());
+					ri.setParameters(new ArrayList<String>());
+					ri.getParameters().addAll(report.getParamater());
+					
+					reportsList.getReports().add(ri);
+				}
+			}
+			
+			
+			response.setContentType("application/json");
+			response.getWriter().println(gson.toJson(reportsList).trim());
 			response.getWriter().flush();
 		}
 	}
