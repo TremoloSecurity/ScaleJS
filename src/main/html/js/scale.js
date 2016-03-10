@@ -166,6 +166,8 @@ limitations under the License.
 */
 
     app.controller('ScaleController',['$compile', '$scope','$window','$http',function($compile, $scope, $window, $http){
+
+
       this.appIsError = false;
       this.sessionLoaded = false;
       this.config = config;
@@ -176,6 +178,7 @@ limitations under the License.
       this.reports = [""];
       this.user = user;
       this.orgs = [orgs];
+      this.reportOrgs;
       this.completedWorkflows = ['wf1','wf3'];
       this.workflows = workflows;
       this.approvalSub = false;
@@ -192,6 +195,11 @@ limitations under the License.
       this.saveUserSuccess = false;
       this.submitRequestsDisabled = false;
 
+      this.reportsShowMain = true;
+      this.reportsShowParams = false;
+      this.reportsShowReport = false;
+      this.currentReport = {};
+
       this.rowNumber = 0;
       this.currentApproval = approvalDetails;
 
@@ -202,6 +210,33 @@ limitations under the License.
 
 
       //Methods
+      this.paramsEntered = function () {
+
+        var ok = true;
+        if (this.currentReport.parameters) {
+          if (this.currentReport.parameters.indexOf('beginDate') >= 0) {
+            ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.beginDate);
+          }
+
+          if (this.currentReport.parameters.indexOf('endDate') >= 0) {
+            ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.endDate);
+          }
+
+          if (this.currentReport.parameters.indexOf('user') >= 0) {
+            ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.user);
+
+          }
+        }
+
+        return ok;
+
+
+
+      }
+
+      this.debugme = function() {
+        alert(this.currentReport.paramVals.beginDate.format('MMMM Do YYYY'));
+      }
 
       this.submitRequests = function() {
         this.submitRequestsDisabled = true;
@@ -277,11 +312,15 @@ limitations under the License.
       };
 
       this.displayName = function() {
-        val = this.attributes[this.config.displayNameAttribute];
-        if (val == null) {
-          return "No User Loaded";
+        if (this.config) {
+          val = this.attributes[this.config.displayNameAttribute];
+          if (val == null) {
+            return "No User Loaded";
+          } else {
+            return val;
+          }
         } else {
-          return val;
+          return "No User Loaded";
         }
       };
 
@@ -302,6 +341,11 @@ limitations under the License.
         this.currentTab = val;
         this.rowNumber = 0;
         this.approvalSub = false;
+
+        this.reportsShowMain = true;
+        this.reportsShowReport = false;
+        this.reportsShowParams = false;
+
       };
 
       this.selectRequestAccessOrg = function(node) {
@@ -322,7 +366,35 @@ limitations under the License.
 
 
 
+      };
 
+      this.selectReportOrg = function(node) {
+        this.reportCurrentNode = node;
+        this.loadReportsErrors = [];
+
+
+        $http.get('main/reports/org/' + this.reportCurrentNode.id).
+          then(function(response) {
+            $scope.scale.reports[$scope.scale.reportCurrentNode.id] = response.data.reports;
+            $scope.scale.reportCurrentReports = $scope.scale.reports[$scope.scale.reportCurrentNode.id];
+
+          },
+          function(response) {
+            $scope.scale.loadReportsErrors = response.data.errors;
+            $scope.scale.reportCurrentReports = [];
+
+          }
+        );
+
+      }
+
+      this.runReport = function(report) {
+        this.currentReport = report;
+        if (report.parameters && report.parameters.length > 0) {
+          this.reportsShowReport = false;
+          this.reportsShowMain = false;
+          this.reportsShowParams = true;
+        }
       };
 
       this.isWorkflowCompleted = function(name) {
@@ -467,6 +539,8 @@ limitations under the License.
         this.approvalErrors = [];
       }
 
+
+
       this.finishApproval = function() {
         var approvalData = {};
         approvalData.reason = this.currentApproval.reason;
@@ -585,7 +659,7 @@ limitations under the License.
                 $http.get('main/orgs').
                   then(function(response) {
                     $scope.scale.orgs = [response.data];
-
+                    $scope.scale.reportOrgs = [JSON.parse(JSON.stringify(response.data))];
 
                     $http.get('main/approvals').
                       then(function(response) {
@@ -674,7 +748,74 @@ limitations under the License.
         };
       });
 
+      app.directive("calendar", function() {
+          return {
+              restrict: "E",
+              templateUrl: "templates/calendar.html",
+              scope: {
+                  selected: "="
+              },
+              link: function(scope) {
+                  scope.selected = _removeTime(scope.selected || moment());
+                  scope.month = scope.selected.clone();
 
+                  var start = scope.selected.clone();
+                  start.date(1);
+                  _removeTime(start.day(0));
+
+                  _buildMonth(scope, start, scope.month);
+
+                  scope.select = function(day) {
+                      scope.selected = day.date;
+                  };
+
+                  scope.next = function() {
+                      var next = scope.month.clone();
+                      _removeTime(next.month(next.month()+1).date(1));
+                      scope.month.month(scope.month.month()+1);
+                      _buildMonth(scope, next, scope.month);
+                  };
+
+                  scope.previous = function() {
+                      var previous = scope.month.clone();
+                      _removeTime(previous.month(previous.month()-1).date(1));
+                      scope.month.month(scope.month.month()-1);
+                      _buildMonth(scope, previous, scope.month);
+                  };
+              }
+          };
+
+          function _removeTime(date) {
+              return date.day(0).hour(0).minute(0).second(0).millisecond(0);
+          }
+
+          function _buildMonth(scope, start, month) {
+              scope.weeks = [];
+              var done = false, date = start.clone(), monthIndex = date.month(), count = 0;
+              while (!done) {
+                  scope.weeks.push({ days: _buildWeek(date.clone(), month) });
+                  date.add(1, "w");
+                  done = count++ > 2 && monthIndex !== date.month();
+                  monthIndex = date.month();
+              }
+          }
+
+          function _buildWeek(date, month) {
+              var days = [];
+              for (var i = 0; i < 7; i++) {
+                  days.push({
+                      name: date.format("dd").substring(0, 1),
+                      number: date.date(),
+                      isCurrentMonth: date.month() === month.month(),
+                      isToday: date.isSame(new Date(), "day"),
+                      date: date
+                  });
+                  date = date.clone();
+                  date.add(1, "d");
+              }
+              return days;
+          }
+      });
 
 })();
 

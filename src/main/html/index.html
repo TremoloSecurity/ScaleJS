@@ -26,8 +26,51 @@ limitations under the License.
     <link href="css/bootstrap.min.css" rel="stylesheet" />
 		<link href="css/angular.treeview.css" rel="stylesheet" />
 		<link href="css/unison.css" rel="stylesheet" />
+		<link href="css/calendar.css" rel="stylesheet" />
+		<style type="text/less">
+			body { font-family:Arial; font-size:14px; }
+			body>span, body>h1 { float:left; width:100%; margin:0; padding:0; margin-bottom:10px; }
+
+			span {
+                >b { color:black; }
+            }
+
+            .vertical-centre (@height) { height:@height; line-height:@height !important; display:inline-block; vertical-align:middle; }
+            .border-box { box-sizing:border-box; -moz-box-sizing:border-box; }
+
+            @border-colour:#CCC;
+            calendar { float:left; display:block; .border-box; background:white; width:300px; border:solid 1px @border-colour; margin-bottom:10px;
+                @secondary-colour:#31708f;
+                @spacing:10px;
+
+                @icon-width:40px;
+                @header-height:40px;
+
+                >div.header { float:left; width:100%; background:@secondary-colour; height:@header-height; color:white;
+                    >* { .vertical-centre(@header-height); }
+                    >i { float:left; width:@icon-width; font-size:1.125em; font-weight:bold; position:relative; .border-box; padding:0 @spacing; cursor:pointer; }
+                    >i.fa-angle-left { text-align:left; }
+                    >i.fa-angle-right { text-align:right; margin-left:@icon-width*-1; }
+                    >span { float:left; width:100%; font-weight:bold; text-transform:uppercase; .border-box; padding-left:@icon-width+@spacing; margin-left:@icon-width*-1; text-align:center; padding-right:@icon-width; color:inherit; }
+                }
+                >div.week { float:left; width:100%; border-top:solid 1px @border-colour;
+                    &:first-child { border-top:none; }
+                    >span.day { float:left; width:100%/7; .border-box; border-left:solid 1px @border-colour; font-size:0.75em; text-align:center; .vertical-centre(30px); background:white; cursor:pointer; color:black;
+                        &:first-child { border-left:none; }
+                        &.today { background:#E3F2FF; }
+                        &.different-month { color:#C0C0C0; }
+                        &.selected { background:@secondary-colour; color:white; }
+                    }
+                    &.names>span { color:@secondary-colour; font-weight:bold; }
+                }
+            }
+        </style>
 	<link href="//maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css"
       type="text/css" rel="stylesheet" />
+
+			<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/less.js/1.7.5/less.min.js"></script>
+<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/underscore.js/1.7.0/underscore-min.js"></script>
+		<script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/moment.js/2.8.3/moment.min.js"></script>
     <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
     <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
 		<!--
@@ -592,6 +635,85 @@ limitations under the License.
 
 		</div>
 
+		<!-- reports -->
+		<div ng-show="scale.isSelectedTab('reports')">
+			<div ng-show="scale.reportsShowMain" >
+				<h2>View Reports</h2>
+				<div class="row" ng-show="scale.loadReportsErrors.lngth > 0">
+					<div class="alert alert-danger" >
+						<b>There was a problem loading available reports : </b>
+						<ul>
+								<li ng-repeat="msg in scale.loadReportsErrors">{{ msg }}</li>
+						</ul>
+					</div>
+				</div>
+				<div class="row">
+					<div class="col-md-6">
+						<div
+							data-angular-treeview="true"
+							data-tree-id="reportOrgs"
+							data-tree-model="scale.reportOrgs"
+							data-node-id="id"
+							data-node-label="name"
+							data-node-children="subOrgs"
+							data-ng-click="scale.selectReportOrg(reportOrgs.currentNode)"
+							>
+						</div>
+					</div>
+
+					<div class="col-md-6">
+						<div class="alert alert-info " >
+							<h3 >{{ scale.reportCurrentNode.name }}</h3>
+							{{ scale.reportCurrentNode.description }}
+						</div>
+					</div>
+
+				</div>
+
+				<div class="row" ng-class-odd="'row-odd'" ng-class-even="'row-even'" ng-repeat="report in scale.reportCurrentReports">
+					<div class="col-md-4">
+						<a href ng-click="scale.runReport(report)">{{ report.name }}</a>
+
+					</div>
+					<div class="col-md-4">
+						<a href ng-click="scale.runReport(report)">{{ report.description }}</a>
+					</div>
+
+				</div>
+		</div>
+		<div ng-show="scale.reportsShowParams">
+			<h3>Parameters for {{ scale.currentReport.name }}</h3>
+
+
+			<div ng-show="scale.currentReport.parameters.indexOf('user') >= 0">
+				user
+			</div>
+			<div class="row" ng-show="scale.currentReport.parameters.indexOf('beginDate') >= 0">
+				<div class="col-md-2">Begin Date</div>
+				<div class="col-md-2">{{ scale.currentReport.paramVals.beginDate.format('MMMM Do, YYYY')  }}</div>
+				<div class="col-md-1"> </div>
+				<div class="col-md-7"> <calendar selected="scale.currentReport.paramVals.beginDate"></calendar></div>
+			</div>
+			<div class="row" ng-show="scale.currentReport.parameters.indexOf('endDate') >= 0">
+				<div class="col-md-2">End Date</div>
+				<div class="col-md-2">{{ scale.currentReport.paramVals.endDate.format('MMMM Do, YYYY')  }}</div>
+				<div class="col-md-1"> </div>
+				<div class="col-md-7"> <calendar selected="scale.currentReport.paramVals.endDate"></calendar></div>
+
+			</div>
+
+			<div class="row" >
+				<input type="button" class="btn btn-lg btn-primary btn-block"
+					value="Run Report" ng-hide="! scale.paramsEntered()" ng-click=""/>
+			</div>
+
+		</div>
+		<div ng-show="scale.reportsShowReport">
+
+		</div>
+		<div class="row">
+
+		</div>
 	</div>
 
 	</div>
