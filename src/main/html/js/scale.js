@@ -195,10 +195,13 @@ limitations under the License.
       this.saveUserSuccess = false;
       this.submitRequestsDisabled = false;
 
+
       this.reportsShowMain = true;
       this.reportsShowParams = false;
       this.reportsShowReport = false;
       this.currentReport = {};
+      this.reportData = {};
+
 
       this.rowNumber = 0;
       this.currentApproval = approvalDetails;
@@ -210,6 +213,102 @@ limitations under the License.
 
 
       //Methods
+      this.loadReportExcel = function() {
+        var url = 'main/reports/' + encodeURIComponent(this.currentReport.name);
+        var params = '?excel=true';
+
+        for (p in this.currentReport.paramVals) {
+          if (params === '') {
+            params = '?';
+          } else {
+            params += '&';
+          }
+
+          params += p + '=' + this.currentReport.paramVals[p];
+
+        }
+
+        url += params;
+
+        this.modalMessage = "Running Report...";
+        this.showModal = true;
+        this.reportErrors = [];
+
+
+        $http.get(url).then(
+          function(response) {
+
+            var uri = 'main/reports/excel/' + encodeURIComponent(response.data.reportid) + '/' + encodeURIComponent($scope.scale.currentReport.name) + '.xlsx';
+
+            $scope.scale.reportsShowParams = false;
+            $scope.scale.reportsShowMain = false;
+            $scope.scale.reportsShowReport = true;
+            $scope.scale.reportErrors = [];
+            $scope.scale.showModal = false;
+
+            window.location = uri;
+
+          },
+          function (response) {
+            $scope.scale.reportsShowParams = false;
+            $scope.scale.reportsShowMain = false;
+            $scope.scale.reportsShowReport = true;
+            $scope.scale.showModal = false;
+          }
+        )
+
+      };
+
+
+      this.loadReport = function() {
+        var url = 'main/reports/' + encodeURIComponent(this.currentReport.name);
+        var params = '';
+
+        for (p in this.currentReport.paramVals) {
+          if (params === '') {
+            params = '?';
+          } else {
+            params += '&';
+          }
+
+          params += p + '=' + this.currentReport.paramVals[p];
+
+        }
+
+        url += params;
+
+        this.modalMessage = "Running Report...";
+        this.showModal = true;
+        this.reportErrors = [];
+        this.reportData.when = moment();
+
+        $http.get(url).then(
+          function(response) {
+
+            $scope.scale.reportData.data = response.data;
+
+            $scope.scale.reportsShowParams = false;
+            $scope.scale.reportsShowMain = false;
+            $scope.scale.reportsShowReport = true;
+            $scope.scale.reportErrors = [];
+            $scope.scale.showModal = false;
+
+
+
+          },
+          function (response) {
+
+            $scope.scale.reportErrors = response.data.errors;
+
+            $scope.scale.reportsShowParams = false;
+            $scope.scale.reportsShowMain = false;
+            $scope.scale.reportsShowReport = true;
+            $scope.scale.showModal = false;
+          }
+        )
+
+      };
+
       this.paramsEntered = function () {
 
         var ok = true;
@@ -222,8 +321,8 @@ limitations under the License.
             ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.endDate);
           }
 
-          if (this.currentReport.parameters.indexOf('user') >= 0) {
-            ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.user);
+          if (this.currentReport.parameters.indexOf('userKey') >= 0) {
+            ok = ok && (this.currentReport.paramVals && this.currentReport.paramVals.userKey);
 
           }
         }
@@ -394,6 +493,8 @@ limitations under the License.
           this.reportsShowReport = false;
           this.reportsShowMain = false;
           this.reportsShowParams = true;
+        } else {
+          this.loadReport();
         }
       };
 

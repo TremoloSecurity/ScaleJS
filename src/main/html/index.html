@@ -650,7 +650,7 @@ limitations under the License.
 			<h3>Parameters for {{ scale.currentReport.name }}</h3>
 
 
-			<div ng-show="scale.currentReport.parameters.indexOf('user') >= 0">
+			<div ng-show="scale.currentReport.parameters.indexOf('userKey') >= 0">
 				user
 			</div>
 			<div class="row" ng-show="scale.currentReport.parameters.indexOf('beginDate') >= 0">
@@ -669,12 +669,57 @@ limitations under the License.
 
 			<div class="row" >
 				<input type="button" class="btn btn-lg btn-primary btn-block"
-					value="Run Report" ng-hide="! scale.paramsEntered()" ng-click=""/>
+					value="Run Report" ng-hide="! scale.paramsEntered()" ng-click="scale.loadReport()"/>
 			</div>
 
 		</div>
 		<div ng-show="scale.reportsShowReport">
+			<div class="row" ng-show="scale.reportErrors.length > 0">
+				<div class="alert alert-danger" >
+					<b>There was a problem loading the report : </b>
+					<ul>
+							<li ng-repeat="msg in scale.reportErrors">{{ msg }}</li>
+					</ul>
+				</div>
+			</div>
+			<div class="row" ng-show="scale.reportErrors.length == 0">
+				<div class="row">
+						<h3>{{ scale.reportData.data.name }}</h3>
+						{{ scale.reportData.data.description }}
+					</div>
+					<div class="row">
+						{{ scale.reportData.when.format('MMMM Do, YYYY h:mm:ss a') }}
+					</div>
+					<div class="row">
+						<a href="" ng-click="scale.loadReportExcel()">Export to Excel</a>
+					</div>
+					<div ng-repeat="grouping in scale.reportData.data.grouping">
+						<table class="table">
+							<tr ng-repeat="header in scale.reportData.data.headerFields">
+								<th scope="row">{{ header }}</th>
+								<td>{{ grouping.header[header] }}
+							</tr>
+						</table>
 
+						<table class="table table-striped">
+							<tr>
+								<th scope="col" ng-repeat="header in scale.reportData.data.dataFields">{{ header }}</th>
+							</tr>
+							<tr ng-repeat="row in grouping.data">
+								<td ng-repeat="field in scale.reportData.data.dataFields">{{ row[field] }}</td>
+
+							</tr>
+
+						</table>
+					</div>
+			</div>
+			<div class="row" ng-show="scale.reportData.grouping.length == 0">
+
+					<div class="alert alert-info" >
+						No data was returned for this report.  Please check your parameters and try again.
+					</div>
+
+				</div>
 		</div>
 		<div class="row">
 

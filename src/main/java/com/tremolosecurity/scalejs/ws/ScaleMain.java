@@ -19,18 +19,38 @@ import static org.apache.directory.ldap.client.api.search.FilterBuilder.equal;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.MalformedURLException;
+import java.net.URLDecoder;
+import java.sql.Connection;
+import java.sql.Date;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.UUID;
 import java.util.regex.Matcher;
 
 import javax.servlet.http.HttpSession;
 
 import org.apache.log4j.Logger;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Font;
+import org.apache.poi.ss.usermodel.RichTextString;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
+import org.apache.poi.ss.util.WorkbookUtil;
+import org.apache.poi.xssf.usermodel.XSSFRichTextString;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.joda.time.DateTime;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -53,7 +73,10 @@ import com.tremolosecurity.provisioning.service.util.ApprovalDetails;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummaries;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummary;
 import com.tremolosecurity.provisioning.service.util.Organization;
+import com.tremolosecurity.provisioning.service.util.ProvisioningResult;
+import com.tremolosecurity.provisioning.service.util.ReportGrouping;
 import com.tremolosecurity.provisioning.service.util.ReportInformation;
+import com.tremolosecurity.provisioning.service.util.ReportResults;
 import com.tremolosecurity.provisioning.service.util.ReportsList;
 import com.tremolosecurity.provisioning.service.util.ServiceActions;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
@@ -72,6 +95,7 @@ import com.tremolosecurity.proxy.filter.HttpFilterRequest;
 import com.tremolosecurity.proxy.filter.HttpFilterResponse;
 import com.tremolosecurity.proxy.util.ProxyConstants;
 import com.tremolosecurity.saml.Attribute;
+
 import com.tremolosecurity.scalejs.cfg.ScaleAttribute;
 import com.tremolosecurity.scalejs.cfg.ScaleConfig;
 import com.tremolosecurity.scalejs.data.ScaleApprovalData;
@@ -164,6 +188,128 @@ public class ScaleMain implements HttpFilter {
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/org/")) {
 			loadReports(request, response, gson);
 			
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/excel/")) {
+			
+			int lastslash = request.getRequestURI().lastIndexOf('/');
+			int secondlastslash = request.getRequestURI().lastIndexOf('/', lastslash - 1);
+			
+			String id = request.getRequestURI().substring(secondlastslash + 1,lastslash);
+			
+			ReportResults res = (ReportResults) request.getSession().getAttribute(id);
+			
+			if (res == null) {
+				response.setStatus(404);
+				ScaleError error = new ScaleError();
+				error.getErrors().add("Report no longer available");
+				response.getWriter().print(gson.toJson(error).trim());
+				response.getWriter().flush();
+			} else {
+				
+			
+				
+				
+				response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
+				response.setHeader("Pragma", "no-cache");
+				
+				
+				
+				
+				Workbook wb = new XSSFWorkbook();
+				
+				Font font = wb.createFont();
+				font.setBold(true);
+				
+				Font titleFont = wb.createFont();
+				titleFont.setBold(true);
+				titleFont.setFontHeightInPoints((short) 16);
+				
+				Sheet sheet = wb.createSheet(WorkbookUtil.createSafeSheetName(res.getName()));
+				
+				//Create a header
+				Row row = sheet.createRow(0);
+				Cell cell = row.createCell(0);
+				
+				RichTextString title = new XSSFRichTextString(res.getName());
+				title.applyFont(titleFont);
+				
+				sheet.addMergedRegion(new CellRangeAddress(0,0,0,3));
+				
+				
+				cell.setCellValue(title);
+				
+				row = sheet.createRow(1);
+				cell = row.createCell(0);
+				cell.setCellValue(res.getDescription());
+				
+				sheet.addMergedRegion(new CellRangeAddress(1,1,0,3));
+				
+				row = sheet.createRow(2);
+				cell = row.createCell(0);
+				//cell.setCellValue(new DateTime().toString("MMMM Do, YYYY h:mm:ss a"));
+				
+				sheet.addMergedRegion(new CellRangeAddress(2,2,0,3));
+				
+				row = sheet.createRow(3);
+				
+				int rowNum = 4;
+				
+				if (res.getGrouping().isEmpty()) {
+					row = sheet.createRow(rowNum);
+					cell = row.createCell(0);
+					cell.setCellValue("There is no data for this report");
+				} else {
+					
+					for (ReportGrouping group : res.getGrouping()) {
+						for (String colHeader : res.getHeaderFields()) {
+							row = sheet.createRow(rowNum);
+							cell = row.createCell(0);
+							
+							RichTextString rcolHeader = new XSSFRichTextString(colHeader);
+							rcolHeader.applyFont(font);
+							
+							cell.setCellValue(rcolHeader);
+							cell = row.createCell(1);
+							cell.setCellValue(group.getHeader().get(colHeader));
+							
+							rowNum++;
+						}
+						
+						row = sheet.createRow(rowNum);
+						
+						int cellNum = 0;
+						for (String colHeader : res.getDataFields()) {
+							cell = row.createCell(cellNum);
+							
+							RichTextString rcolHeader = new XSSFRichTextString(colHeader);
+							rcolHeader.applyFont(font);
+							cell.setCellValue(rcolHeader);
+							cellNum++;
+						}
+						
+						rowNum++;
+						
+						for (Map<String,String> dataRow : group.getData()) {
+							cellNum = 0;
+							row = sheet.createRow(rowNum);
+							for (String colHeader : res.getDataFields()) {
+								cell = row.createCell(cellNum);
+								cell.setCellValue(dataRow.get(colHeader));
+								cellNum++;
+							}
+							rowNum++;
+						}
+						
+						row = sheet.createRow(rowNum);
+						rowNum++;
+					}
+					
+				}
+				
+				response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+				wb.write(response.getOutputStream());
+			}
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/")) {
+			runReport(request, response, gson);
 		}
 		
 		
@@ -175,6 +321,213 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+	}
+
+
+	private void runReport(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+			throws UnsupportedEncodingException, IOException, MalformedURLException, ProvisioningException,
+			SQLException {
+		String name = URLDecoder.decode(request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1), "UTF-8");
+		ReportType reportToRun = null;
+		
+		for (ReportType report : GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getReports().getReport()) {
+			if (report.getName().equalsIgnoreCase(name)) {
+				reportToRun = report;
+				break;
+			}
+		}
+		
+		
+		
+		if (reportToRun == null) {
+			response.setStatus(404);
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Report not found");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+		} else {
+			HashSet<String> allowedOrgs = new HashSet<String>();
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
+			AzSys az = new AzSys();			
+			this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
+			
+			if (allowedOrgs.contains(reportToRun.getOrgID())) {
+				
+				
+				
+				
+				Connection db = null;
+				PreparedStatement ps = null;
+				ResultSet rs = null;
+				try {
+					db = GlobalEntries.getGlobalEntries().getConfigManager().getProvisioningEngine().getApprovalDBConn();
+					if (logger.isDebugEnabled()) {
+						logger.debug("Report SQL : '" + reportToRun.getSql() + "'");
+					}
+					ps = db.prepareStatement(reportToRun.getSql());
+					int i = 1;
+					for (String paramType : reportToRun.getParamater()) {
+						switch (paramType) {
+							case "currentUser" :
+								if (logger.isDebugEnabled()) {
+									logger.debug("Current User : '" + request.getParameter("currentUser") + "'");
+								}
+								ps.setString(i, request.getParameter("currentUser").getValues().get(0)); 
+								break;
+							case "userKey" : 
+								if (logger.isDebugEnabled()) {
+									logger.debug("User Key : '" + request.getParameter("userKey") + "'");
+								}
+								ps.setString(i, request.getParameter("userKey").getValues().get(0)); 
+								break;
+							case "beginDate" :
+								String beginDate = request.getParameter("beginDate").getValues().get(0);
+								if (logger.isDebugEnabled()) {
+									logger.debug("Begin Date : '" + beginDate + "'");
+								}
+								Date d = new Date(Long.parseLong(beginDate));
+								ps.setDate(i, d);
+								break;
+								
+							case "endDate" :
+								
+								String endDate = request.getParameter("endDate").getValues().get(0);
+								if (logger.isDebugEnabled()) {
+									logger.debug("End Date : '" + endDate + "'");
+								}
+								Date de = new Date(Long.parseLong(endDate));
+								ps.setDate(i, de);
+								break;
+						}
+						
+						i++;
+					}
+					
+					rs = ps.executeQuery();
+					
+					
+					String groupingVal = null;
+					ReportResults res = new ReportResults();
+					res.setName(reportToRun.getName());
+					res.setDescription(reportToRun.getDescription());
+					res.setDataFields(reportToRun.getDataFields());
+					res.setHeaderFields(reportToRun.getHeaderFields());
+					res.setGrouping(new ArrayList<ReportGrouping>());
+					
+					ReportGrouping grouping = null;
+					
+					if (! reportToRun.isGroupings()) {
+						grouping = new ReportGrouping();
+						grouping.setData(new ArrayList<Map<String,String>>());
+						grouping.setHeader(new HashMap<String,String>());
+						res.getGrouping().add(grouping);
+					}
+					
+					logger.debug("Running report");
+					
+					while (rs.next()) {
+						if (logger.isDebugEnabled()) {
+							logger.debug("New row");
+						}
+						
+						HashMap<String,String> row = new HashMap<String,String>();
+						
+						for (String dataField : reportToRun.getDataFields()) {
+							if (logger.isDebugEnabled()) {
+								logger.debug("Field - " + dataField + "='" + rs.getString(dataField) + "'");
+							}
+							row.put(dataField, rs.getString(dataField));
+						}
+						
+						
+						if (reportToRun.isGroupings()) {
+							String rowID = rs.getString(reportToRun.getGroupBy()); 
+							if (logger.isDebugEnabled()) {
+								logger.debug("Grouping Val : '" + groupingVal + "'");
+								logger.debug("Group By : '" + reportToRun.getGroupBy() + "'");
+								logger.debug("Value of Group By in row : '" + rowID + "'");
+								
+							}
+							
+							if (groupingVal == null || ! groupingVal.equals(rowID)) {
+								grouping = new ReportGrouping();
+								grouping.setData(new ArrayList<Map<String,String>>());
+								grouping.setHeader(new HashMap<String,String>());
+								res.getGrouping().add(grouping);
+								
+								for (String headerField : reportToRun.getHeaderFields()) {
+									grouping.getHeader().put(headerField, rs.getString(headerField));
+								}
+								
+								groupingVal = rowID;
+							}
+						}
+						
+						grouping.getData().add(row);
+					}
+					
+					if (request.getParameter("excel") != null && request.getParameter("excel").getValues().get(0).equalsIgnoreCase("true")) {
+						UUID id = UUID.randomUUID();
+						String sid = id.toString();
+						Map<String,String> map = new HashMap<String,String>();
+						map.put("reportid", sid);
+						request.getSession().setAttribute(sid, res);
+						String json = gson.toJson(map);
+						
+						if (logger.isDebugEnabled()) {
+							logger.debug("JSON : " + json);
+						}
+						response.setContentType("application/json");
+						response.getWriter().print(json);
+						response.getWriter().flush();
+					} else {
+						ProvisioningResult pres = new ProvisioningResult();
+						pres.setSuccess(true);
+						pres.setReportResults(res);
+						
+						String json = gson.toJson(res);
+						
+						if (logger.isDebugEnabled()) {
+							logger.debug("JSON : " + json);
+						}
+						response.setContentType("application/json");
+						response.getWriter().print(json);
+						response.getWriter().flush();
+					}
+				} finally {
+					if (rs != null) {
+						try {
+							rs.close();
+						} catch (Throwable t) {
+							
+						}
+					}
+					
+					if (ps != null) {
+						try {
+							ps.close();
+						} catch (Throwable t) {
+							
+						}
+					}
+					
+					if (db != null) {
+						try {
+							db.close();
+						} catch (Throwable t) {
+							
+						}
+					}
+				}
+			} else {
+				response.setStatus(401);
+				ScaleError error = new ScaleError();
+				error.getErrors().add("Unauthorized");
+				response.getWriter().print(gson.toJson(error).trim());
+				response.getWriter().flush();
+			}
+		}
 	}
 
 
