@@ -214,6 +214,41 @@ limitations under the License.
 	  	<h2>{{ scale.config.frontPage.title }}</h2>
 			{{ scale.config.frontPage.text }}
 
+			<div class="row" ng-show="scale.config.showPortalOrgs">
+				<div class="col-md-6" >
+					<div
+						data-angular-treeview="true"
+						data-tree-id="portalOrgs"
+						data-tree-model="scale.portalOrgs"
+						data-node-id="id"
+						data-node-label="name"
+						data-node-children="subOrgs"
+						data-ng-click="scale.selectPortalOrgs(portalOrgs.currentNode)"
+						>
+					</div>
+				</div>
+
+				<div class="col-md-6">
+					<div class="alert alert-info " >
+						<h3 >{{ scale.portalCurrentNode.name }}</h3>
+						{{ scale.portalCurrentNode.description }}
+					</div>
+				</div>
+
+
+			</div>
+			<div class="row">
+				<div class="col-sm-6 col-md-4" ng-repeat="url in scale.portalURLs">
+					<div class="thumbnail" style="background:#eeeeee;">
+						<a href="{{url.url}}" target="{{url.label}}"><img
+							src="data:image/png;base64,{{url.icon}}" alt="{{url.label}}"/></a>
+						<div class="caption">
+							<center><h3>{{url.label}}</h3></center>
+						</div>
+					</div>
+				</div>
+			</div>
+
 		</div>
 
 		<div ng-show="scale.isSelectedTab('requestAccess')">

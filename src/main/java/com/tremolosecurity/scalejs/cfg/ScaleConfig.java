@@ -23,6 +23,7 @@ public class ScaleConfig {
 	String uidAttributeName;
 	ScaleFrontPage frontPage;
 	boolean canEditUser;
+	boolean showPortalOrgs;
 	
 	
 	transient String workflowName;
@@ -94,6 +95,14 @@ public class ScaleConfig {
 
 	public Map<String, ScaleAttribute> getApprovalAttributes() {
 		return approvalAttributes;
+	}
+
+	public boolean isShowPortalOrgs() {
+		return showPortalOrgs;
+	}
+
+	public void setShowPortalOrgs(boolean showPortalOrgs) {
+		this.showPortalOrgs = showPortalOrgs;
 	}
 	
 	

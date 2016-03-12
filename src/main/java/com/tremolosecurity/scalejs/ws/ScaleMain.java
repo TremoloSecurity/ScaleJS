@@ -65,6 +65,8 @@ import com.tremolosecurity.config.util.ConfigManager;
 import com.tremolosecurity.config.xml.ApplicationType;
 import com.tremolosecurity.config.xml.AzRuleType;
 import com.tremolosecurity.config.xml.OrgType;
+import com.tremolosecurity.config.xml.PortalUrlType;
+import com.tremolosecurity.config.xml.PortalUrlsType;
 import com.tremolosecurity.config.xml.ReportType;
 import com.tremolosecurity.config.xml.ReportsType;
 import com.tremolosecurity.config.xml.WorkflowType;
@@ -73,6 +75,8 @@ import com.tremolosecurity.provisioning.service.util.ApprovalDetails;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummaries;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummary;
 import com.tremolosecurity.provisioning.service.util.Organization;
+import com.tremolosecurity.provisioning.service.util.PortalURL;
+import com.tremolosecurity.provisioning.service.util.PortalURLs;
 import com.tremolosecurity.provisioning.service.util.ProvisioningResult;
 import com.tremolosecurity.provisioning.service.util.ReportGrouping;
 import com.tremolosecurity.provisioning.service.util.ReportInformation;
@@ -190,126 +194,91 @@ public class ScaleMain implements HttpFilter {
 			
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/excel/")) {
 			
-			int lastslash = request.getRequestURI().lastIndexOf('/');
-			int secondlastslash = request.getRequestURI().lastIndexOf('/', lastslash - 1);
-			
-			String id = request.getRequestURI().substring(secondlastslash + 1,lastslash);
-			
-			ReportResults res = (ReportResults) request.getSession().getAttribute(id);
-			
-			if (res == null) {
-				response.setStatus(404);
-				ScaleError error = new ScaleError();
-				error.getErrors().add("Report no longer available");
-				response.getWriter().print(gson.toJson(error).trim());
-				response.getWriter().flush();
-			} else {
-				
-			
-				
-				
-				response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
-				response.setHeader("Pragma", "no-cache");
-				
-				
-				
-				
-				Workbook wb = new XSSFWorkbook();
-				
-				Font font = wb.createFont();
-				font.setBold(true);
-				
-				Font titleFont = wb.createFont();
-				titleFont.setBold(true);
-				titleFont.setFontHeightInPoints((short) 16);
-				
-				Sheet sheet = wb.createSheet(WorkbookUtil.createSafeSheetName(res.getName()));
-				
-				//Create a header
-				Row row = sheet.createRow(0);
-				Cell cell = row.createCell(0);
-				
-				RichTextString title = new XSSFRichTextString(res.getName());
-				title.applyFont(titleFont);
-				
-				sheet.addMergedRegion(new CellRangeAddress(0,0,0,3));
-				
-				
-				cell.setCellValue(title);
-				
-				row = sheet.createRow(1);
-				cell = row.createCell(0);
-				cell.setCellValue(res.getDescription());
-				
-				sheet.addMergedRegion(new CellRangeAddress(1,1,0,3));
-				
-				row = sheet.createRow(2);
-				cell = row.createCell(0);
-				//cell.setCellValue(new DateTime().toString("MMMM Do, YYYY h:mm:ss a"));
-				
-				sheet.addMergedRegion(new CellRangeAddress(2,2,0,3));
-				
-				row = sheet.createRow(3);
-				
-				int rowNum = 4;
-				
-				if (res.getGrouping().isEmpty()) {
-					row = sheet.createRow(rowNum);
-					cell = row.createCell(0);
-					cell.setCellValue("There is no data for this report");
-				} else {
-					
-					for (ReportGrouping group : res.getGrouping()) {
-						for (String colHeader : res.getHeaderFields()) {
-							row = sheet.createRow(rowNum);
-							cell = row.createCell(0);
-							
-							RichTextString rcolHeader = new XSSFRichTextString(colHeader);
-							rcolHeader.applyFont(font);
-							
-							cell.setCellValue(rcolHeader);
-							cell = row.createCell(1);
-							cell.setCellValue(group.getHeader().get(colHeader));
-							
-							rowNum++;
-						}
-						
-						row = sheet.createRow(rowNum);
-						
-						int cellNum = 0;
-						for (String colHeader : res.getDataFields()) {
-							cell = row.createCell(cellNum);
-							
-							RichTextString rcolHeader = new XSSFRichTextString(colHeader);
-							rcolHeader.applyFont(font);
-							cell.setCellValue(rcolHeader);
-							cellNum++;
-						}
-						
-						rowNum++;
-						
-						for (Map<String,String> dataRow : group.getData()) {
-							cellNum = 0;
-							row = sheet.createRow(rowNum);
-							for (String colHeader : res.getDataFields()) {
-								cell = row.createCell(cellNum);
-								cell.setCellValue(dataRow.get(colHeader));
-								cellNum++;
-							}
-							rowNum++;
-						}
-						
-						row = sheet.createRow(rowNum);
-						rowNum++;
-					}
-					
-				}
-				
-				response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-				wb.write(response.getOutputStream());
-			}
+			exportToExcel(request, response, gson);
 		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/reports/")) {
 			runReport(request, response, gson);
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().endsWith("/main/urls")) {
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			AzSys az = new AzSys();
+			
+			PortalUrlsType pt = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getPortal();
+			
+			PortalURLs urls = new PortalURLs();
+			
+			for (PortalUrlType url : pt.getUrls()) {
+				if (url.getAzRules() != null && url.getAzRules().getRule().size() > 0) {
+					ArrayList<AzRule> rules = new ArrayList<AzRule>();
+					
+					for (AzRuleType art : url.getAzRules().getRule()) {
+						rules.add(new AzRule(art.getScope(),art.getConstraint(),art.getClassName(),GlobalEntries.getGlobalEntries().getConfigManager(),null));
+					}
+					
+					
+					if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType)) {
+						continue;
+					}
+				}
+				
+				PortalURL purl = new PortalURL();
+				purl.setName(url.getName());
+				purl.setLabel(url.getLabel());
+				purl.setOrg(url.getOrg());
+				purl.setUrl(url.getUrl());
+				purl.setIcon(url.getIcon());
+				
+				urls.getUrls().add(purl);
+				
+				
+			}
+			
+			
+			
+			
+			response.getWriter().print(gson.toJson(urls.getUrls()).trim());
+			response.getWriter().flush();
+		} else if (request.getMethod().equalsIgnoreCase("GET") && request.getRequestURI().contains("/main/urls/org")) {
+			String id = URLDecoder.decode(request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1), "UTF-8");
+			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			AzSys az = new AzSys();
+			
+			PortalUrlsType pt = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getPortal();
+			
+			PortalURLs urls = new PortalURLs();
+			
+			for (PortalUrlType url : pt.getUrls()) {
+				
+				if (url.getOrg().equalsIgnoreCase(id)) {
+				
+					if (url.getAzRules() != null && url.getAzRules().getRule().size() > 0) {
+						ArrayList<AzRule> rules = new ArrayList<AzRule>();
+						
+						for (AzRuleType art : url.getAzRules().getRule()) {
+							rules.add(new AzRule(art.getScope(),art.getConstraint(),art.getClassName(),GlobalEntries.getGlobalEntries().getConfigManager(),null));
+						}
+						
+						
+						if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType)) {
+							continue;
+						}
+					}
+					
+					PortalURL purl = new PortalURL();
+					purl.setName(url.getName());
+					purl.setLabel(url.getLabel());
+					purl.setOrg(url.getOrg());
+					purl.setUrl(url.getUrl());
+					purl.setIcon(url.getIcon());
+					
+					urls.getUrls().add(purl);
+				
+				}
+			}
+			
+			
+			
+			
+			response.getWriter().print(gson.toJson(urls.getUrls()).trim());
+			response.getWriter().flush();
 		}
 		
 		
@@ -321,6 +290,128 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+	}
+
+
+	private void exportToExcel(HttpFilterRequest request, HttpFilterResponse response, Gson gson) throws IOException {
+		int lastslash = request.getRequestURI().lastIndexOf('/');
+		int secondlastslash = request.getRequestURI().lastIndexOf('/', lastslash - 1);
+		
+		String id = request.getRequestURI().substring(secondlastslash + 1,lastslash);
+		
+		ReportResults res = (ReportResults) request.getSession().getAttribute(id);
+		
+		if (res == null) {
+			response.setStatus(404);
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Report no longer available");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+		} else {
+			
+		
+			
+			
+			response.setHeader("Cache-Control", "private, no-store, no-cache, must-revalidate");
+			response.setHeader("Pragma", "no-cache");
+			
+			
+			
+			
+			Workbook wb = new XSSFWorkbook();
+			
+			Font font = wb.createFont();
+			font.setBold(true);
+			
+			Font titleFont = wb.createFont();
+			titleFont.setBold(true);
+			titleFont.setFontHeightInPoints((short) 16);
+			
+			Sheet sheet = wb.createSheet(WorkbookUtil.createSafeSheetName(res.getName()));
+			
+			//Create a header
+			Row row = sheet.createRow(0);
+			Cell cell = row.createCell(0);
+			
+			RichTextString title = new XSSFRichTextString(res.getName());
+			title.applyFont(titleFont);
+			
+			sheet.addMergedRegion(new CellRangeAddress(0,0,0,3));
+			
+			
+			cell.setCellValue(title);
+			
+			row = sheet.createRow(1);
+			cell = row.createCell(0);
+			cell.setCellValue(res.getDescription());
+			
+			sheet.addMergedRegion(new CellRangeAddress(1,1,0,3));
+			
+			row = sheet.createRow(2);
+			cell = row.createCell(0);
+			//cell.setCellValue(new DateTime().toString("MMMM Do, YYYY h:mm:ss a"));
+			
+			sheet.addMergedRegion(new CellRangeAddress(2,2,0,3));
+			
+			row = sheet.createRow(3);
+			
+			int rowNum = 4;
+			
+			if (res.getGrouping().isEmpty()) {
+				row = sheet.createRow(rowNum);
+				cell = row.createCell(0);
+				cell.setCellValue("There is no data for this report");
+			} else {
+				
+				for (ReportGrouping group : res.getGrouping()) {
+					for (String colHeader : res.getHeaderFields()) {
+						row = sheet.createRow(rowNum);
+						cell = row.createCell(0);
+						
+						RichTextString rcolHeader = new XSSFRichTextString(colHeader);
+						rcolHeader.applyFont(font);
+						
+						cell.setCellValue(rcolHeader);
+						cell = row.createCell(1);
+						cell.setCellValue(group.getHeader().get(colHeader));
+						
+						rowNum++;
+					}
+					
+					row = sheet.createRow(rowNum);
+					
+					int cellNum = 0;
+					for (String colHeader : res.getDataFields()) {
+						cell = row.createCell(cellNum);
+						
+						RichTextString rcolHeader = new XSSFRichTextString(colHeader);
+						rcolHeader.applyFont(font);
+						cell.setCellValue(rcolHeader);
+						cellNum++;
+					}
+					
+					rowNum++;
+					
+					for (Map<String,String> dataRow : group.getData()) {
+						cellNum = 0;
+						row = sheet.createRow(rowNum);
+						for (String colHeader : res.getDataFields()) {
+							cell = row.createCell(cellNum);
+							cell.setCellValue(dataRow.get(colHeader));
+							cellNum++;
+						}
+						rowNum++;
+					}
+					
+					row = sheet.createRow(rowNum);
+					rowNum++;
+				}
+				
+			}
+			
+			response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+			wb.write(response.getOutputStream());
+		}
 	}
 
 
@@ -1000,6 +1091,7 @@ public class ScaleMain implements HttpFilter {
 		scaleConfig.setCanEditUser(this.loadAttributeValue("canEditUser", "User Fields Editable", config).equalsIgnoreCase("true"));
 		scaleConfig.setWorkflowName(this.loadAttributeValue("workflowName", "Save User Workflow", config));
 		scaleConfig.setUidAttributeName(this.loadAttributeValue("uidAttributeName", "User ID Attribute Name", config));
+		scaleConfig.setShowPortalOrgs(this.loadAttributeValue("showPortalOrgs", "Show Portal Orgs", config).equalsIgnoreCase("true"));
 		String val = this.loadOptionalAttributeValue("roleAttribute", "Role Attribute Name", config);
 				
 		

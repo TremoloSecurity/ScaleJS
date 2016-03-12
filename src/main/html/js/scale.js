@@ -201,6 +201,7 @@ limitations under the License.
       this.reportsShowReport = false;
       this.currentReport = {};
       this.reportData = {};
+      this.portalOrgs = [];
 
 
       this.rowNumber = 0;
@@ -444,6 +445,21 @@ limitations under the License.
         this.reportsShowMain = true;
         this.reportsShowReport = false;
         this.reportsShowParams = false;
+
+      };
+
+      this.selectPortalOrgs = function(node) {
+        this.portalCurrentNode = node;
+
+        $http.get('main/urls/org/' + encodeURIComponent(node.id)).then(
+          function(response) {
+            $scope.scale.portalURLs = response.data;
+
+          },
+          function(response) {
+
+          }
+        );
 
       };
 
@@ -762,11 +778,36 @@ limitations under the License.
                     $scope.scale.orgs = [response.data];
                     $scope.scale.reportOrgs = [JSON.parse(JSON.stringify(response.data))];
 
+                    if ($scope.scale.config.showPortalOrgs) {
+                      $scope.scale.portalOrgs = [JSON.parse(JSON.stringify(response.data))];
+                      $scope.portalOrgs.currentNode = $scope.scale.portalOrgs[0];
+                      
+                    }
+
                     $http.get('main/approvals').
                       then(function(response) {
                           $scope.scale.approvals = response.data.approvals;
-                          $scope.scale.setSessionLoadedComplete();
-                          $scope.$apply();
+
+
+                          if (! $scope.scale.config.showPortalOrgs) {
+                            $http.get('main/urls').then(
+                              function(response) {
+                                $scope.scale.portalURLs = response.data;
+                                $scope.portalOrgs.currentNode = $scope.scale.portalURLs[0];
+                                $scope.scale.setSessionLoadedComplete();
+                                $scope.$apply();
+
+                              },
+                              function(response) {
+                                $scope.scale.setSessionLoadedComplete();
+                                $scope.$apply();
+                              }
+                            );
+                          } else {
+                            $scope.scale.setSessionLoadedComplete();
+                            $scope.$apply();
+                          }
+
                       },
                       function(response) {
                         $scope.scale.appIsError = true;
