@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 (function(){
-  var app = angular.module('scale',['angularTreeview']);
+  var app = angular.module('scale',['treeControl']);
 
   var config;
 
@@ -207,6 +207,21 @@ limitations under the License.
       this.rowNumber = 0;
       this.currentApproval = approvalDetails;
 
+      this.treeOptions = {
+          nodeChildren: "subOrgs",
+          dirSelectable: true,
+          injectClasses: {
+              ul: "a1",
+              li: "a2",
+              //liSelected: "a7",
+              iExpanded: "a3",
+              iCollapsed: "a4",
+              iLeaf: "a5",
+              label: "a6",
+              //labelSelected: "a8"
+          }
+      };
+
       //Initialize the attributes
       //for (var i in user.attributes) {
       //  this.attributes[user.attributes[i].name] = user.attributes[i].values[0];
@@ -214,6 +229,10 @@ limitations under the License.
 
 
       //Methods
+      this.finishLogout = function() {
+          window.location = this.config.logoutURL;
+      };
+
       this.loadReportExcel = function() {
         var url = 'main/reports/' + encodeURIComponent(this.currentReport.name);
         var params = '?excel=true';
@@ -438,13 +457,24 @@ limitations under the License.
       };
 
       this.setSelectedTab = function(val) {
-        this.currentTab = val;
-        this.rowNumber = 0;
-        this.approvalSub = false;
+        if (val === 'logout') {
+          if (this.cart && _.isEmpty(this.cart)) {
+            app = {};
+            this.finishLogout();
+          } else {
+            this.currentTab = val;
+          }
+        } else {
+          this.currentTab = val;
+          this.rowNumber = 0;
+          this.approvalSub = false;
 
-        this.reportsShowMain = true;
-        this.reportsShowReport = false;
-        this.reportsShowParams = false;
+          this.reportsShowMain = true;
+          this.reportsShowReport = false;
+          this.reportsShowParams = false;
+        }
+
+
 
       };
 
@@ -776,12 +806,21 @@ limitations under the License.
                 $http.get('main/orgs').
                   then(function(response) {
                     $scope.scale.orgs = [response.data];
+                    $scope.scale.requestAccessOrgsSelectedNode = $scope.scale.orgs[0];
+                    $scope.scale.requestAccessOrgsExpandedNodes =[$scope.scale.orgs[0]];
+                    $scope.scale.selectRequestAccessOrg($scope.scale.orgs[0]);
+
                     $scope.scale.reportOrgs = [JSON.parse(JSON.stringify(response.data))];
+                    $scope.scale.reportOrgsSelectedNode = $scope.scale.reportOrgs[0];
+                    $scope.scale.reportOrgsExpandedNodes = [$scope.scale.reportOrgs[0]];
+                    $scope.scale.selectReportOrg($scope.scale.reportOrgsSelectedNode);
 
                     if ($scope.scale.config.showPortalOrgs) {
                       $scope.scale.portalOrgs = [JSON.parse(JSON.stringify(response.data))];
-                      $scope.portalOrgs.currentNode = $scope.scale.portalOrgs[0];
-                      
+                      $scope.scale.portalOrgsSelectedNode = $scope.scale.portalOrgs[0];
+                      $scope.scale.portalOrgsExpandedNodes = [$scope.scale.portalOrgs[0]];
+                      $scope.scale.selectPortalOrgs($scope.scale.portalOrgsSelectedNode);
+
                     }
 
                     $http.get('main/approvals').
@@ -960,10 +999,3 @@ limitations under the License.
       });
 
 })();
-
-
-
-
-(function(f){f.module("angularTreeview",[]).directive("treeModel",function($compile){return{restrict:"A",link:function(b,h,c){var a=c.treeId,g=c.treeModel,e=c.nodeLabel||"label",d=c.nodeChildren||"children",e='<ul><li data-ng-repeat="node in '+g+'"><i class="collapsed" data-ng-show="node.'+d+'.length && node.collapsed" data-ng-click="'+a+'.selectNodeHead(node)"></i><i class="expanded" data-ng-show="node.'+d+'.length && !node.collapsed" data-ng-click="'+a+'.selectNodeHead(node)"></i><i class="normal" data-ng-hide="node.'+
-d+'.length"></i> <span data-ng-class="node.selected" data-ng-click="'+a+'.selectNodeLabel(node)">{{node.'+e+'}}</span><div data-ng-hide="node.collapsed" data-tree-id="'+a+'" data-tree-model="node.'+d+'" data-node-id='+(c.nodeId||"id")+" data-node-label="+e+" data-node-children="+d+"></div></li></ul>";a&&g&&(c.angularTreeview&&(b[a]=b[a]||{},b[a].selectNodeHead=b[a].selectNodeHead||function(a){a.collapsed=!a.collapsed},b[a].selectNodeLabel=b[a].selectNodeLabel||function(c){b[a].currentNode&&b[a].currentNode.selected&&
-(b[a].currentNode.selected=void 0);c.selected="selected";b[a].currentNode=c}),h.html('').append($compile(e)(b)))}}})})(angular);

@@ -30,7 +30,7 @@ limitations under the License.
 		<link href="css/calendar.less" rel="stylesheet/less" type="text/css" />
 	<link href="css/font-awesome.min.css"
       type="text/css" rel="stylesheet" />
-
+			<link rel="stylesheet" type="text/css" href="css/tree-control.css">
 			<script type="text/javascript" src="js/less.min.js"></script>
 <script type="text/javascript" src="js/underscore-min.js"></script>
 		<script type="text/javascript" src="js/moment.min.js"></script>
@@ -215,18 +215,16 @@ limitations under the License.
 			{{ scale.config.frontPage.text }}
 
 			<div class="row" ng-show="scale.config.showPortalOrgs">
-				<div class="col-md-6" >
-					<div
-						data-angular-treeview="true"
-						data-tree-id="portalOrgs"
-						data-tree-model="scale.portalOrgs"
-						data-node-id="id"
-						data-node-label="name"
-						data-node-children="subOrgs"
-						data-ng-click="scale.selectPortalOrgs(portalOrgs.currentNode)"
-						>
-					</div>
-				</div>
+
+
+				<treecontrol class="tree-light col-md-6"
+				   tree-model="scale.portalOrgs"
+				   options="scale.treeOptions"
+				   on-selection="scale.selectPortalOrgs(node)"
+				   selected-node="scale.portalOrgsSelectedNode"
+					 expanded-nodes="scale.portalOrgsExpandedNodes">
+				   {{node.name}}
+				</treecontrol>
 
 				<div class="col-md-6">
 					<div class="alert alert-info " >
@@ -262,18 +260,16 @@ limitations under the License.
 				</div>
 			</div>
 			<div class="row">
-				<div class="col-md-6">
-					<div
-						data-angular-treeview="true"
-						data-tree-id="requestAccessOrgs"
-						data-tree-model="scale.orgs"
-						data-node-id="id"
-						data-node-label="name"
-						data-node-children="subOrgs"
-						data-ng-click="scale.selectRequestAccessOrg(requestAccessOrgs.currentNode)"
-						>
-					</div>
-				</div>
+				<treecontrol class="tree-light col-md-6"
+				   tree-model="scale.orgs"
+				   options="scale.treeOptions"
+				   on-selection="scale.selectRequestAccessOrg(node)"
+				   selected-node="scale.requestAccessOrgsSelectedNode"
+					 expanded-nodes="scale.requestAccessOrgsExpandedNodes">
+				   {{node.name}}
+				</treecontrol>
+
+
 
 				<div class="col-md-6">
 					<div class="alert alert-info " >
@@ -648,18 +644,16 @@ limitations under the License.
 					</div>
 				</div>
 				<div class="row">
-					<div class="col-md-6">
-						<div
-							data-angular-treeview="true"
-							data-tree-id="reportOrgs"
-							data-tree-model="scale.reportOrgs"
-							data-node-id="id"
-							data-node-label="name"
-							data-node-children="subOrgs"
-							data-ng-click="scale.selectReportOrg(reportOrgs.currentNode)"
-							>
-						</div>
-					</div>
+
+
+					<treecontrol class="tree-light col-md-6"
+					   tree-model="scale.reportOrgs"
+					   options="scale.treeOptions"
+					   on-selection="scale.selectReportOrg(node)"
+					   selected-node="scale.reportOrgsSelectedNode"
+						 expanded-nodes="scale.reportOrgsExpandedNodes">
+					   {{node.name}}
+					</treecontrol>
 
 					<div class="col-md-6">
 						<div class="alert alert-info " >
@@ -686,7 +680,12 @@ limitations under the License.
 
 
 			<div ng-show="scale.currentReport.parameters.indexOf('userKey') >= 0">
-				user
+				<div class="row">
+						<div class="col-md-4">User</div>
+						<div class="col-md-8">
+							<input type="text" ng-model="scale.currentReport.paramVals.beginDate" aria-label="User"/>
+						</div>
+					</div>
 			</div>
 			<div class="row" ng-show="scale.currentReport.parameters.indexOf('beginDate') >= 0">
 				<div class="col-md-2">Begin Date</div>
@@ -760,6 +759,13 @@ limitations under the License.
 
 		</div>
 	</div>
+	<!-- reports -->
+	<div ng-show="scale.isSelectedTab('logout')">
+		<div class="alert alert-danger" >
+						<b>There are still items in your cart.  Don't forget to check them out to complete the requests.</b><br />
+						<a href="" ng-click="scale.finishLogout()">Continue to logout</a>
+					</div>
+	</div>
 
 	</div>
 
@@ -776,6 +782,9 @@ limitations under the License.
 	<script src="js/bootstrap.min.js"></script>
 
 	<script src="js/angular.min.js"></script>
+
+	<script type="text/javascript" src="js/angular-tree-control.js"></script>
+
 
 <script src="js/scale.js"></script>
 
