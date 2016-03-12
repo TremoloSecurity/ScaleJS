@@ -24,7 +24,7 @@ public class ScaleConfig {
 	ScaleFrontPage frontPage;
 	boolean canEditUser;
 	boolean showPortalOrgs;
-	
+	String logoutURL;
 	
 	transient String workflowName;
 	Map<String,ScaleAttribute> attributes;
@@ -103,6 +103,14 @@ public class ScaleConfig {
 
 	public void setShowPortalOrgs(boolean showPortalOrgs) {
 		this.showPortalOrgs = showPortalOrgs;
+	}
+
+	public String getLogoutURL() {
+		return logoutURL;
+	}
+
+	public void setLogoutURL(String logoutURL) {
+		this.logoutURL = logoutURL;
 	}
 	
 	

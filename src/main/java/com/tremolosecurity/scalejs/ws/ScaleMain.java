@@ -1092,6 +1092,7 @@ public class ScaleMain implements HttpFilter {
 		scaleConfig.setWorkflowName(this.loadAttributeValue("workflowName", "Save User Workflow", config));
 		scaleConfig.setUidAttributeName(this.loadAttributeValue("uidAttributeName", "User ID Attribute Name", config));
 		scaleConfig.setShowPortalOrgs(this.loadAttributeValue("showPortalOrgs", "Show Portal Orgs", config).equalsIgnoreCase("true"));
+		scaleConfig.setLogoutURL(this.loadAttributeValue("logoutURL", "Logout URL", config));
 		String val = this.loadOptionalAttributeValue("roleAttribute", "Role Attribute Name", config);
 				
 		
