@@ -832,7 +832,7 @@ limitations under the License.
                             $http.get('main/urls').then(
                               function(response) {
                                 $scope.scale.portalURLs = response.data;
-                                $scope.portalOrgs.currentNode = $scope.scale.portalURLs[0];
+                                
                                 $scope.scale.setSessionLoadedComplete();
                                 $scope.$apply();
 
