@@ -22,6 +22,7 @@ limitations under the License.
   <packaging>pom</packaging>
   <modules>
   	<module>unison-scalejs-main</module>
+  	<module>unison-scalejs-token</module>
   </modules>
   <build>
   	<plugins>
