@@ -15,31 +15,41 @@ limitations under the License.
  -->
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent>
-    <groupId>com.tremolosecurity.unison</groupId>
-    <artifactId>unison</artifactId>
-    <version>1.0.6</version>
-  </parent>
-  <artifactId>unison-scalejs-main</artifactId>
-  <name>unison-scalejs-main</name>
-    <dependencies>
-  	<dependency>
-  		<groupId>com.tremolosecurity.unison</groupId>
-  		<artifactId>unison-server-core</artifactId>
-  		<version>1.0.6</version>
-  		<scope>provided</scope>
-  	</dependency>
-  			<dependency>
-			<!-- Provided by Tomcat, but needed for compilation -->
-			<groupId>javax</groupId>
-			<artifactId>javaee-web-api</artifactId>
-			<version>7.0</version>
-			<scope>provided</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.apache.poi</groupId>
-			<artifactId>poi-ooxml</artifactId>
-			<version>3.12</version>
-		</dependency>
-  	</dependencies>
+  <artifactId>unison-scalejs</artifactId>
+  <groupId>com.tremolosecurity.unison</groupId>
+  <version>1.0.6</version>
+  <name>unison-scalejs</name>
+  <packaging>pom</packaging>
+  <modules>
+  	<module>unison-scalejs-main</module>
+  </modules>
+  <build>
+  	<plugins>
+  		<plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>2.3.2</version>
+        <configuration>
+        	<source>1.7</source>
+        	<target>1.7</target>
+        </configuration>
+        <executions>
+          <execution>
+            <id>default-testCompile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>default-compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+  	</plugins>
+
+  </build>
 </project>
