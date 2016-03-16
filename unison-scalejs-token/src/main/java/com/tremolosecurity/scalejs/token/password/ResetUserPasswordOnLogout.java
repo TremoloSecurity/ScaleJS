@@ -35,7 +35,7 @@ public class ResetUserPasswordOnLogout implements LogoutHandler {
 	String userID;
 	String uidAttributeName;
 	
-	public ResetUserPasswordOnLogout(String workflow,String userID,String uidAttributeName) {
+	public ResetUserPasswordOnLogout(String workflow,String uidAttributeName,String userID) {
 		this.workflow = workflow;
 		this.userID = userID;
 		this.uidAttributeName = uidAttributeName;
