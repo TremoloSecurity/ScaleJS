@@ -20,6 +20,7 @@ import java.util.HashMap;
 import javax.servlet.http.HttpSession;
 
 import com.tremolosecurity.proxy.auth.AuthInfo;
+import com.tremolosecurity.proxy.filter.HttpFilterConfig;
 import com.tremolosecurity.saml.Attribute;
 
 public interface TokenLoader {
@@ -29,7 +30,7 @@ public interface TokenLoader {
 	 * @param params
 	 * @throws Exception
 	 */
-	public void init(HashMap<String,Attribute> params) throws Exception;
+	public void init(HttpFilterConfig config) throws Exception;
 	
 	
 	/**
