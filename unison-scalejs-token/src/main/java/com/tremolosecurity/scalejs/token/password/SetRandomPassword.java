@@ -84,7 +84,7 @@ public class SetRandomPassword implements CustomTask {
 			Gson gson = new Gson();
 			String json = gson.toJson(msg);
 			user.setPassword(password);
-			user.getAttribs().put("password", new Attribute("password",json));
+			user.getAttribs().put(this.attributeName, new Attribute(this.attributeName,json));
 		} catch (Throwable t) {
 			throw new ProvisioningException("Could not generate random password",t);
 		}
