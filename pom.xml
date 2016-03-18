@@ -20,6 +20,12 @@ limitations under the License.
   <version>1.0.6</version>
   <name>unison-scalejs</name>
   <packaging>pom</packaging>
+    <repositories>
+    <repository>
+      <id>Tremolo Security</id>
+      <url>https://www.tremolosecurity.com/nexus/content/repositories/releases/</url>
+    </repository>
+  </repositories>
   <modules>
   	<module>unison-scalejs-main</module>
   	<module>unison-scalejs-token</module>
