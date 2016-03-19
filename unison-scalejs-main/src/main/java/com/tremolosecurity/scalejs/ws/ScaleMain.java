@@ -848,7 +848,7 @@ public class ScaleMain implements HttpFilter {
 					ri.setOrgID(report.getOrgID());
 					ri.setParameters(new ArrayList<String>());
 					ri.getParameters().addAll(report.getParamater());
-					
+					ri.getParameters().remove("currentUser");
 					reportsList.getReports().add(ri);
 				}
 			}
