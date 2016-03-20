@@ -461,10 +461,11 @@ public class ScaleMain implements HttpFilter {
 					for (String paramType : reportToRun.getParamater()) {
 						switch (paramType) {
 							case "currentUser" :
+								String userid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0);
 								if (logger.isDebugEnabled()) {
-									logger.debug("Current User : '" + request.getParameter("currentUser") + "'");
+									logger.debug("Current User : '" + userid + "'");
 								}
-								ps.setString(i, request.getParameter("currentUser").getValues().get(0)); 
+								ps.setString(i, userid); 
 								break;
 							case "userKey" : 
 								if (logger.isDebugEnabled()) {
