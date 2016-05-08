@@ -3,27 +3,27 @@
   <parent>
     <groupId>com.tremolosecurity.unison</groupId>
     <artifactId>unison-scalejs</artifactId>
-    <version>1.0.6</version>
+    <version>1.0.7</version>
   </parent>
   <artifactId>unison-scalejs-token</artifactId>
   <dependencies>
   	<dependency>
   		<groupId>com.tremolosecurity.unison</groupId>
   		<artifactId>unison-server-core</artifactId>
-  		<version>1.0.6</version>
+  		<version>${openunison.version}</version>
   		<scope>provided</scope>
   	</dependency>
   			<dependency>
 			<!-- Provided by Tomcat, but needed for compilation -->
 			<groupId>javax</groupId>
 			<artifactId>javaee-web-api</artifactId>
-			<version>7.0</version>
+			<version>${javaee.version}</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>com.tremolosecurity.unison</groupId>
 			<artifactId>unison-scalejs-common</artifactId>
-			<version>1.0.6</version>
+			<version>${openunison.version}</version>
 		</dependency>
 	</dependencies>
 </project>

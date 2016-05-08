@@ -50,6 +50,8 @@ import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.WorkbookUtil;
 import org.apache.poi.xssf.usermodel.XSSFRichTextString;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.hibernate.Session;
+import org.hibernate.jdbc.Work;
 import org.joda.time.DateTime;
 
 import com.google.gson.Gson;
@@ -214,7 +216,7 @@ public class ScaleMain implements HttpFilter {
 					}
 					
 					
-					if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType)) {
+					if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType,new HashMap<String,Object>())) {
 						continue;
 					}
 				}
@@ -257,7 +259,7 @@ public class ScaleMain implements HttpFilter {
 						}
 						
 						
-						if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType)) {
+						if (! az.checkRules(userData, GlobalEntries.getGlobalEntries().getConfigManager(), rules,request.getSession(),this.appType,new HashMap<String,Object>())) {
 							continue;
 						}
 					}
@@ -415,7 +417,7 @@ public class ScaleMain implements HttpFilter {
 	}
 
 
-	private void runReport(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
+	private void runReport(final HttpFilterRequest request, final HttpFilterResponse response, final Gson gson)
 			throws UnsupportedEncodingException, IOException, MalformedURLException, ProvisioningException,
 			SQLException {
 		String name = URLDecoder.decode(request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1), "UTF-8");
@@ -438,186 +440,211 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		} else {
 			HashSet<String> allowedOrgs = new HashSet<String>();
-			AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
+			final AuthInfo userData = ((AuthController) request.getSession().getAttribute(ProxyConstants.AUTH_CTL)).getAuthInfo();
 			OrgType ot = GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getOrg();
 			AzSys az = new AzSys();			
 			this.checkOrg(allowedOrgs, ot, az, userData, request.getSession());
 			
 			if (allowedOrgs.contains(reportToRun.getOrgID())) {
-				
-				
-				
-				
 				Connection db = null;
-				PreparedStatement ps = null;
-				ResultSet rs = null;
+				
+				final ReportType reportToRunUse = reportToRun;
+				
 				try {
-					db = GlobalEntries.getGlobalEntries().getConfigManager().getProvisioningEngine().getApprovalDBConn();
-					if (logger.isDebugEnabled()) {
-						logger.debug("Report SQL : '" + reportToRun.getSql() + "'");
-					}
-					ps = db.prepareStatement(reportToRun.getSql());
-					int i = 1;
-					for (String paramType : reportToRun.getParamater()) {
-						switch (paramType) {
-							case "currentUser" :
-								String userid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0);
-								if (logger.isDebugEnabled()) {
-									logger.debug("Current User : '" + userid + "'");
-								}
-								ps.setString(i, userid); 
-								break;
-							case "userKey" : 
-								if (logger.isDebugEnabled()) {
-									logger.debug("User Key : '" + request.getParameter("userKey") + "'");
-								}
-								ps.setString(i, request.getParameter("userKey").getValues().get(0)); 
-								break;
-							case "beginDate" :
-								String beginDate = request.getParameter("beginDate").getValues().get(0);
-								if (logger.isDebugEnabled()) {
-									logger.debug("Begin Date : '" + beginDate + "'");
-								}
-								Date d = new Date(Long.parseLong(beginDate));
-								ps.setDate(i, d);
-								break;
-								
-							case "endDate" :
-								
-								String endDate = request.getParameter("endDate").getValues().get(0);
-								if (logger.isDebugEnabled()) {
-									logger.debug("End Date : '" + endDate + "'");
-								}
-								Date de = new Date(Long.parseLong(endDate));
-								ps.setDate(i, de);
-								break;
-						}
-						
-						i++;
-					}
+					Session session = GlobalEntries.getGlobalEntries().getConfigManager().getProvisioningEngine().getHibernateSessionFactory().openSession();
+					session.doWork(
+							new Work() {
+						        public void execute(Connection connection) throws SQLException 
+						        { 
+						        	try {
+						        		generateReport(request, response, gson, reportToRunUse, userData, connection);
+									} catch (IOException e) {
+										throw new SQLException("Could not run reports",e);
+									}
+						        }
+						    }
+							);
 					
-					rs = ps.executeQuery();
-					
-					
-					String groupingVal = null;
-					ReportResults res = new ReportResults();
-					res.setName(reportToRun.getName());
-					res.setDescription(reportToRun.getDescription());
-					res.setDataFields(reportToRun.getDataFields());
-					res.setHeaderFields(reportToRun.getHeaderFields());
-					res.setGrouping(new ArrayList<ReportGrouping>());
-					
-					ReportGrouping grouping = null;
-					
-					if (! reportToRun.isGroupings()) {
-						grouping = new ReportGrouping();
-						grouping.setData(new ArrayList<Map<String,String>>());
-						grouping.setHeader(new HashMap<String,String>());
-						res.getGrouping().add(grouping);
-					}
-					
-					logger.debug("Running report");
-					
-					while (rs.next()) {
-						if (logger.isDebugEnabled()) {
-							logger.debug("New row");
-						}
-						
-						HashMap<String,String> row = new HashMap<String,String>();
-						
-						for (String dataField : reportToRun.getDataFields()) {
-							if (logger.isDebugEnabled()) {
-								logger.debug("Field - " + dataField + "='" + rs.getString(dataField) + "'");
-							}
-							row.put(dataField, rs.getString(dataField));
-						}
-						
-						
-						if (reportToRun.isGroupings()) {
-							String rowID = rs.getString(reportToRun.getGroupBy()); 
-							if (logger.isDebugEnabled()) {
-								logger.debug("Grouping Val : '" + groupingVal + "'");
-								logger.debug("Group By : '" + reportToRun.getGroupBy() + "'");
-								logger.debug("Value of Group By in row : '" + rowID + "'");
-								
-							}
-							
-							if (groupingVal == null || ! groupingVal.equals(rowID)) {
-								grouping = new ReportGrouping();
-								grouping.setData(new ArrayList<Map<String,String>>());
-								grouping.setHeader(new HashMap<String,String>());
-								res.getGrouping().add(grouping);
-								
-								for (String headerField : reportToRun.getHeaderFields()) {
-									grouping.getHeader().put(headerField, rs.getString(headerField));
-								}
-								
-								groupingVal = rowID;
-							}
-						}
-						
-						grouping.getData().add(row);
-					}
-					
-					if (request.getParameter("excel") != null && request.getParameter("excel").getValues().get(0).equalsIgnoreCase("true")) {
-						UUID id = UUID.randomUUID();
-						String sid = id.toString();
-						Map<String,String> map = new HashMap<String,String>();
-						map.put("reportid", sid);
-						request.getSession().setAttribute(sid, res);
-						String json = gson.toJson(map);
-						
-						if (logger.isDebugEnabled()) {
-							logger.debug("JSON : " + json);
-						}
-						response.setContentType("application/json");
-						response.getWriter().print(json);
-						response.getWriter().flush();
-					} else {
-						ProvisioningResult pres = new ProvisioningResult();
-						pres.setSuccess(true);
-						pres.setReportResults(res);
-						
-						String json = gson.toJson(res);
-						
-						if (logger.isDebugEnabled()) {
-							logger.debug("JSON : " + json);
-						}
-						response.setContentType("application/json");
-						response.getWriter().print(json);
-						response.getWriter().flush();
-					}
 				} finally {
-					if (rs != null) {
-						try {
-							rs.close();
-						} catch (Throwable t) {
-							
-						}
-					}
 					
-					if (ps != null) {
-						try {
-							ps.close();
-						} catch (Throwable t) {
-							
-						}
-					}
-					
-					if (db != null) {
-						try {
-							db.close();
-						} catch (Throwable t) {
-							
-						}
-					}
 				}
+				
+				
 			} else {
 				response.setStatus(401);
 				ScaleError error = new ScaleError();
 				error.getErrors().add("Unauthorized");
 				response.getWriter().print(gson.toJson(error).trim());
 				response.getWriter().flush();
+			}
+		}
+	}
+
+
+	private void generateReport(HttpFilterRequest request, HttpFilterResponse response, Gson gson,
+			ReportType reportToRun, AuthInfo userData, Connection db) throws SQLException, IOException {
+		PreparedStatement ps = null;
+		ResultSet rs = null;
+		
+		try {
+			
+			if (logger.isDebugEnabled()) {
+				logger.debug("Report SQL : '" + reportToRun.getSql() + "'");
+			}
+			ps = db.prepareStatement(reportToRun.getSql());
+			int i = 1;
+			for (String paramType : reportToRun.getParamater()) {
+				switch (paramType) {
+					case "currentUser" :
+						String userid = userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0);
+						if (logger.isDebugEnabled()) {
+							logger.debug("Current User : '" + userid + "'");
+						}
+						ps.setString(i, userid); 
+						break;
+					case "userKey" : 
+						if (logger.isDebugEnabled()) {
+							logger.debug("User Key : '" + request.getParameter("userKey") + "'");
+						}
+						ps.setString(i, request.getParameter("userKey").getValues().get(0)); 
+						break;
+					case "beginDate" :
+						String beginDate = request.getParameter("beginDate").getValues().get(0);
+						if (logger.isDebugEnabled()) {
+							logger.debug("Begin Date : '" + beginDate + "'");
+						}
+						Date d = new Date(Long.parseLong(beginDate));
+						ps.setDate(i, d);
+						break;
+						
+					case "endDate" :
+						
+						String endDate = request.getParameter("endDate").getValues().get(0);
+						if (logger.isDebugEnabled()) {
+							logger.debug("End Date : '" + endDate + "'");
+						}
+						Date de = new Date(Long.parseLong(endDate));
+						ps.setDate(i, de);
+						break;
+				}
+				
+				i++;
+			}
+			
+			rs = ps.executeQuery();
+			
+			
+			String groupingVal = null;
+			ReportResults res = new ReportResults();
+			res.setName(reportToRun.getName());
+			res.setDescription(reportToRun.getDescription());
+			res.setDataFields(reportToRun.getDataFields());
+			res.setHeaderFields(reportToRun.getHeaderFields());
+			res.setGrouping(new ArrayList<ReportGrouping>());
+			
+			ReportGrouping grouping = null;
+			
+			if (! reportToRun.isGroupings()) {
+				grouping = new ReportGrouping();
+				grouping.setData(new ArrayList<Map<String,String>>());
+				grouping.setHeader(new HashMap<String,String>());
+				res.getGrouping().add(grouping);
+			}
+			
+			logger.debug("Running report");
+			
+			while (rs.next()) {
+				if (logger.isDebugEnabled()) {
+					logger.debug("New row");
+				}
+				
+				HashMap<String,String> row = new HashMap<String,String>();
+				
+				for (String dataField : reportToRun.getDataFields()) {
+					if (logger.isDebugEnabled()) {
+						logger.debug("Field - " + dataField + "='" + rs.getString(dataField) + "'");
+					}
+					row.put(dataField, rs.getString(dataField));
+				}
+				
+				
+				if (reportToRun.isGroupings()) {
+					String rowID = rs.getString(reportToRun.getGroupBy()); 
+					if (logger.isDebugEnabled()) {
+						logger.debug("Grouping Val : '" + groupingVal + "'");
+						logger.debug("Group By : '" + reportToRun.getGroupBy() + "'");
+						logger.debug("Value of Group By in row : '" + rowID + "'");
+						
+					}
+					
+					if (groupingVal == null || ! groupingVal.equals(rowID)) {
+						grouping = new ReportGrouping();
+						grouping.setData(new ArrayList<Map<String,String>>());
+						grouping.setHeader(new HashMap<String,String>());
+						res.getGrouping().add(grouping);
+						
+						for (String headerField : reportToRun.getHeaderFields()) {
+							grouping.getHeader().put(headerField, rs.getString(headerField));
+						}
+						
+						groupingVal = rowID;
+					}
+				}
+				
+				grouping.getData().add(row);
+			}
+			
+			if (request.getParameter("excel") != null && request.getParameter("excel").getValues().get(0).equalsIgnoreCase("true")) {
+				UUID id = UUID.randomUUID();
+				String sid = id.toString();
+				Map<String,String> map = new HashMap<String,String>();
+				map.put("reportid", sid);
+				request.getSession().setAttribute(sid, res);
+				String json = gson.toJson(map);
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("JSON : " + json);
+				}
+				response.setContentType("application/json");
+				response.getWriter().print(json);
+				response.getWriter().flush();
+			} else {
+				ProvisioningResult pres = new ProvisioningResult();
+				pres.setSuccess(true);
+				pres.setReportResults(res);
+				
+				String json = gson.toJson(res);
+				
+				if (logger.isDebugEnabled()) {
+					logger.debug("JSON : " + json);
+				}
+				response.setContentType("application/json");
+				response.getWriter().print(json);
+				response.getWriter().flush();
+			}
+		} finally {
+			if (rs != null) {
+				try {
+					rs.close();
+				} catch (Throwable t) {
+					
+				}
+			}
+			
+			if (ps != null) {
+				try {
+					ps.close();
+				} catch (Throwable t) {
+					
+				}
+			}
+			
+			if (db != null) {
+				try {
+					db.close();
+				} catch (Throwable t) {
+					
+				}
 			}
 		}
 	}
@@ -874,7 +901,7 @@ public class ScaleMain implements HttpFilter {
 			}
 			
 			
-			if (! az.checkRules(auinfo,cfgMgr , rules)) {
+			if (! az.checkRules(auinfo,cfgMgr , rules, new HashMap<String,Object>())) {
 				return false;
 			}
 		}
@@ -1168,7 +1195,7 @@ public class ScaleMain implements HttpFilter {
 			}
 			
 			
-			if (! az.checkRules(auinfo, cfgMgr, rules,session, this.appType)) {
+			if (! az.checkRules(auinfo, cfgMgr, rules,session, this.appType,new HashMap<String,Object>())) {
 				return;
 			}
 		}
