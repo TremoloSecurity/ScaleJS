@@ -130,7 +130,7 @@ public class ScaleMain implements HttpFilter {
 		
 		
 		
-		
+		try {
 		
 		if (request.getRequestURI().endsWith("/main/config")) {
 			response.setContentType("application/json");
@@ -297,6 +297,16 @@ public class ScaleMain implements HttpFilter {
 			response.getWriter().flush();
 		}
 
+		} catch (Throwable t) {
+			logger.error("Could not execute request",t);
+			
+			response.setStatus(500);
+			ScaleError error = new ScaleError();
+			error.getErrors().add("Operation not supported");
+			response.getWriter().print(gson.toJson(error).trim());
+			response.getWriter().flush();
+			
+		}
 	}
 
 
@@ -788,6 +798,21 @@ public class ScaleMain implements HttpFilter {
 							for (Attribute attr : lm.getAttributes()) {
 								wfCall.getRequestParams().put(attr.getName(), attr.getValues().get(0));
 							}
+						}
+					} else {
+						boolean resultSet = false;
+						for (WorkflowType wf : GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow()) {
+							if (wf.getName().equalsIgnoreCase(req.getName())) {
+								if (wf.getDynamicConfiguration() != null && wf.getDynamicConfiguration().isDynamic()) {
+									results.put(req.getName(),"Unauthorized");
+									resultSet = true;
+									continue;
+								}
+							}
+						}
+						
+						if (resultSet) {
+							continue;
 						}
 					}
 					
