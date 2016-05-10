@@ -23,6 +23,7 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Type;
 import java.net.MalformedURLException;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -53,6 +54,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.hibernate.Session;
 import org.hibernate.jdbc.Work;
 import org.joda.time.DateTime;
+import org.stringtemplate.v4.ST;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
@@ -67,11 +69,13 @@ import com.tremolosecurity.config.util.ConfigManager;
 import com.tremolosecurity.config.xml.ApplicationType;
 import com.tremolosecurity.config.xml.AzRuleType;
 import com.tremolosecurity.config.xml.OrgType;
+import com.tremolosecurity.config.xml.ParamType;
 import com.tremolosecurity.config.xml.PortalUrlType;
 import com.tremolosecurity.config.xml.PortalUrlsType;
 import com.tremolosecurity.config.xml.ReportType;
 import com.tremolosecurity.config.xml.ReportsType;
 import com.tremolosecurity.config.xml.WorkflowType;
+import com.tremolosecurity.lastmile.LastMile;
 import com.tremolosecurity.provisioning.core.ProvisioningException;
 import com.tremolosecurity.provisioning.service.util.ApprovalDetails;
 import com.tremolosecurity.provisioning.service.util.ApprovalSummaries;
@@ -88,6 +92,7 @@ import com.tremolosecurity.provisioning.service.util.ServiceActions;
 import com.tremolosecurity.provisioning.service.util.TremoloUser;
 import com.tremolosecurity.provisioning.service.util.WFCall;
 import com.tremolosecurity.provisioning.service.util.WFDescription;
+import com.tremolosecurity.provisioning.util.DynamicWorkflow;
 import com.tremolosecurity.provisioning.workflow.ApprovalData;
 import com.tremolosecurity.proxy.ProxySys;
 import com.tremolosecurity.proxy.auth.AuthController;
@@ -735,7 +740,7 @@ public class ScaleMain implements HttpFilter {
 
 
 	private void executeWorkflows(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
-			throws MalformedURLException, ProvisioningException, IOException {
+			throws Exception {
 		Type listType = new TypeToken<ArrayList<WorkflowRequest>>() {}.getType();
 		List<WorkflowRequest> reqs = gson.fromJson(new String((byte[])request.getAttribute(ProxySys.MSG_BODY)), listType);
 		HashMap<String,String> results = new HashMap<String,String>();
@@ -770,6 +775,21 @@ public class ScaleMain implements HttpFilter {
 					wfCall.setName(req.getName());
 					wfCall.setReason(req.getReason());
 					wfCall.setUidAttributeName(this.scaleConfig.getUidAttributeName());
+						
+					
+					if (req.getEncryptedParams() != null) {
+						LastMile lm = new LastMile();
+						lm.loadLastMielToken(req.getEncryptedParams(), GlobalEntries.getGlobalEntries().getConfigManager().getSecretKey(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getApprovalDB().getEncryptionKey()));
+						StringBuffer b = new StringBuffer();
+						b.append('/').append(URLEncoder.encode(req.getName(), "UTF-8"));
+						if (! lm.isValid(b.toString())) {
+							throw new ProvisioningException("Invalid parameters");
+						} else {
+							for (Attribute attr : lm.getAttributes()) {
+								wfCall.getRequestParams().put(attr.getName(), attr.getValues().get(0));
+							}
+						}
+					}
 					
 					TremoloUser tu = new TremoloUser();
 					tu.setUid(userData.getAttribs().get(this.scaleConfig.getUidAttributeName()).getValues().get(0));
@@ -797,7 +817,7 @@ public class ScaleMain implements HttpFilter {
 
 
 	private void loadWorkflows(HttpFilterRequest request, HttpFilterResponse response, Gson gson)
-			throws MalformedURLException, ProvisioningException, IOException {
+			throws Exception {
 		String orgid = request.getRequestURI().substring(request.getRequestURI().lastIndexOf('/') + 1);
 		ConfigManager cfgMgr = GlobalEntries.getGlobalEntries().getConfigManager();
 		HashSet<String> allowedOrgs = new HashSet<String>();
@@ -824,14 +844,75 @@ public class ScaleMain implements HttpFilter {
 					
 					if ( wf.getOrgid() == null || wf.getOrgid().equalsIgnoreCase(orgid)) { 
 					
-						WFDescription desc = new WFDescription();
+						if (wf.getDynamicConfiguration() != null && wf.getDynamicConfiguration().isDynamic()) {
+							HashMap<String,Attribute> params = new HashMap<String,Attribute>();
+							if (wf.getDynamicConfiguration().getParam() != null) {
+								for (ParamType p : wf.getDynamicConfiguration().getParam()) {
+									Attribute attr = params.get(p.getName());
+									if (attr == null) {
+										attr = new Attribute(p.getName());
+										params.put(p.getName(), attr);
+									}
+									attr.getValues().add(p.getValue());
+								}
+							}
+							
+							
+							DynamicWorkflow dwf = (DynamicWorkflow) Class.forName(wf.getDynamicConfiguration().getClassName()).newInstance();
+							
+							List<Map<String,String>> wfParams = dwf.generateWorkflows(wf, cfgMgr, params);
+							
+							StringBuffer b = new StringBuffer();
+							b.append('/').append(URLEncoder.encode(wf.getName(),"UTF-8"));
+							String uri = b.toString();
+							for (Map<String,String> wfParamSet : wfParams) {
+								DateTime now = new DateTime();
+								DateTime expires = now.plusHours(1);
+								
+								LastMile lm = new LastMile(uri,now,expires,0,"");
+								for (String key : wfParamSet.keySet()) {
+									String val = wfParamSet.get(key);
+									Attribute attr = new Attribute(key,val);	
+									lm.getAttributes().add(attr);
+								}
+								
+								WFDescription desc = new WFDescription();
+								
+								desc.setName(wf.getName());
+								
+								ST st = new ST(wf.getLabel(),'$','$');
+								for (String key : wfParamSet.keySet()) {
+									st.add(key.replaceAll("[.]", "_"), wfParamSet.get(key));
+								}
+								
+								desc.setLabel(st.render());
+								
+								
+								st = new ST(wf.getDescription(),'$','$');
+								for (String key : wfParamSet.keySet()) {
+									st.add(key.replaceAll("[.]", "_"), wfParamSet.get(key));
+								}
+								desc.setDescription(st.render());
+								
+								desc.setEncryptedParams(lm.generateLastMileToken(cfgMgr.getSecretKey(cfgMgr.getCfg().getProvisioning().getApprovalDB().getEncryptionKey())));
+								
+								workflows.add(desc);
+								
+							}
+							
+							
+						} else {
+							WFDescription desc = new WFDescription();
+							
+							desc.setName(wf.getName());
+							desc.setLabel(wf.getLabel());
+							desc.setDescription(wf.getDescription());
+							
+							
+							workflows.add(desc);
+						}
 						
-						desc.setName(wf.getName());
-						desc.setLabel(wf.getLabel());
-						desc.setDescription(wf.getDescription());
 						
-						
-						workflows.add(desc);
 					}
 				}
 				

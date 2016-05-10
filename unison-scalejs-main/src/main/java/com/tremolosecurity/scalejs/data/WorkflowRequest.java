@@ -18,6 +18,7 @@ package com.tremolosecurity.scalejs.data;
 public class WorkflowRequest {
 	String name;
 	String reason;
+	String encryptedParams;
 	
 	public WorkflowRequest() {
 		
@@ -37,6 +38,14 @@ public class WorkflowRequest {
 
 	public void setReason(String reason) {
 		this.reason = reason;
+	}
+
+	public String getEncryptedParams() {
+		return encryptedParams;
+	}
+
+	public void setEncryptedParams(String encryptedParams) {
+		this.encryptedParams = encryptedParams;
 	}
 	
 	
