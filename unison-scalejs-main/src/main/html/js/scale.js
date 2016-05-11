@@ -366,10 +366,12 @@ limitations under the License.
 
         wfRequests = [];
 
-        for (wfname in this.cart) {
+        for (wfuuid in this.cart) {
           wfrequest = {};
-          wfrequest.name = wfname;
-          wfrequest.reason = this.cart[wfname].reason;
+          wfrequest.uuid = wfuuid;
+          wfrequest.name = this.cart[wfuuid].name;
+          wfrequest.reason = this.cart[wfuuid].reason;
+          wfrequest.encryptedParams = this.cart[wfuuid].encryptedParams;
           wfRequests.push(wfrequest);
         }
 
@@ -378,12 +380,12 @@ limitations under the License.
             $scope.scale.submitRequestsErrors = [];
             $scope.scale.submitRequestSuccess = [];
 
-            for (wfname in  response.data) {
-              if (response.data[wfname] === "success") {
-                $scope.scale.submitRequestSuccess.push($scope.scale.cart[wfname].label);
-                delete $scope.scale.cart[wfname];
+            for (wfuuid in  response.data) {
+              if (response.data[wfuuid] === "success") {
+                $scope.scale.submitRequestSuccess.push($scope.scale.cart[wfuuid].label);
+                delete $scope.scale.cart[wfuuid];
               } else {
-                msg = $scope.scale.cart[wfname].label + ' - ' + response.data[wfname];
+                msg = $scope.scale.cart[wfuuid].label + ' - ' + response.data[wfuuid];
                 $scope.scale.submitRequestsErrors.push(msg);
               }
             }
@@ -569,11 +571,11 @@ limitations under the License.
         if (workflow.inCart) {
           workflow.inCart = false;
           workflow.reason = "";
-          delete this.cart[workflow.name];
+          delete this.cart[workflow.uuid];
         } else {
           workflow.inCart = true;
-          this.cart[workflow.name] = workflow;
-          this.cart[workflow.name].reason = "";
+          this.cart[workflow.uuid] = workflow;
+          this.cart[workflow.uuid].reason = "";
         }
       };
 
@@ -832,7 +834,7 @@ limitations under the License.
                             $http.get('main/urls').then(
                               function(response) {
                                 $scope.scale.portalURLs = response.data;
-                                
+
                                 $scope.scale.setSessionLoadedComplete();
                                 $scope.$apply();
 

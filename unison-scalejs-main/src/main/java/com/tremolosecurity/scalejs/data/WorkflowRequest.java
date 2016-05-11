@@ -19,7 +19,16 @@ public class WorkflowRequest {
 	String name;
 	String reason;
 	String encryptedParams;
+	String uuid;
 	
+	public String getUuid() {
+		return uuid;
+	}
+
+	public void setUuid(String uuid) {
+		this.uuid = uuid;
+	}
+
 	public WorkflowRequest() {
 		
 	}

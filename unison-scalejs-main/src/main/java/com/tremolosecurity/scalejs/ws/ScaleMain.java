@@ -757,7 +757,7 @@ public class ScaleMain implements HttpFilter {
 		
 		for (WorkflowRequest req : reqs) {
 			if (req.getReason() == null || req.getReason().isEmpty()) {
-				results.put(req.getName(), "Reason is required");
+				results.put(req.getUuid(), "Reason is required");
 			} else {
 				
 				HashSet<String> allowedOrgs = new HashSet<String>();
@@ -777,9 +777,9 @@ public class ScaleMain implements HttpFilter {
 				}
 				
 				if (orgid == null) {
-					results.put(req.getName(), "Not Found");
+					results.put(req.getUuid(), "Not Found");
 				} else if (! allowedOrgs.contains(orgid)) {
-					results.put(req.getName(), "Unauthorized");
+					results.put(req.getUuid(), "Unauthorized");
 				} else {
 					WFCall wfCall = new WFCall();
 					wfCall.setName(req.getName());
@@ -804,7 +804,7 @@ public class ScaleMain implements HttpFilter {
 						for (WorkflowType wf : GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getProvisioning().getWorkflows().getWorkflow()) {
 							if (wf.getName().equalsIgnoreCase(req.getName())) {
 								if (wf.getDynamicConfiguration() != null && wf.getDynamicConfiguration().isDynamic()) {
-									results.put(req.getName(),"Unauthorized");
+									results.put(req.getUuid(),"Unauthorized");
 									resultSet = true;
 									continue;
 								}
@@ -825,10 +825,10 @@ public class ScaleMain implements HttpFilter {
 					try {
 						com.tremolosecurity.provisioning.workflow.ExecuteWorkflow exec = new com.tremolosecurity.provisioning.workflow.ExecuteWorkflow();
 						exec.execute(wfCall, GlobalEntries.getGlobalEntries().getConfigManager(), null);
-						results.put(req.getName(), "success");
+						results.put(req.getUuid(), "success");
 					} catch (Exception e) {
 						logger.error("Could not update user",e);
-						results.put(req.getName(), "Error, please contact your system administrator");
+						results.put(req.getUuid(), "Error, please contact your system administrator");
 					}
 				}
 				
@@ -902,7 +902,7 @@ public class ScaleMain implements HttpFilter {
 								}
 								
 								WFDescription desc = new WFDescription();
-								
+								desc.setUuid(UUID.randomUUID().toString());
 								desc.setName(wf.getName());
 								
 								ST st = new ST(wf.getLabel(),'$','$');
@@ -929,6 +929,7 @@ public class ScaleMain implements HttpFilter {
 						} else {
 							WFDescription desc = new WFDescription();
 							
+							desc.setUuid(UUID.randomUUID().toString());
 							desc.setName(wf.getName());
 							desc.setLabel(wf.getLabel());
 							desc.setDescription(wf.getDescription());
