@@ -701,7 +701,7 @@ public class ScaleMain implements HttpFilter {
 				attrs.add(this.scaleConfig.getRoleAttribute());
 			}
 			
-			LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, filter, attrs);
+			LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getLdapRoot(), 2, filter, attrs);
 			
 			if (res.hasMore()) {
 				LDAPEntry entry = res.next();
@@ -726,7 +726,7 @@ public class ScaleMain implements HttpFilter {
 					details.getUserObj().getGroups().clear();
 					ArrayList<String> attrNames = new ArrayList<String>();
 					attrNames.add("cn");
-					LDAPSearchResults res2 = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, equal("uniqueMember",entry.getDN()).toString(), attrNames);
+					LDAPSearchResults res2 = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getLdapRoot(), 2, equal(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getGroupMemberAttribute(),entry.getDN()).toString(), attrNames);
 					
 					while (res2.hasMore()) {
 						LDAPEntry entry2 = res2.next();
@@ -1164,7 +1164,7 @@ public class ScaleMain implements HttpFilter {
 		
 		ArrayList<String> attrNames = new ArrayList<String>();
 		attrNames.add("cn");
-		LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search("o=Tremolo", 2, equal("uniqueMember",userData.getUserDN()).toString(), attrNames);
+		LDAPSearchResults res = GlobalEntries.getGlobalEntries().getConfigManager().getMyVD().search(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getLdapRoot(), 2, equal(GlobalEntries.getGlobalEntries().getConfigManager().getCfg().getGroupMemberAttribute(),userData.getUserDN()).toString(), attrNames);
 		
 		while (res.hasMore()) {
 			LDAPEntry entry = res.next();
